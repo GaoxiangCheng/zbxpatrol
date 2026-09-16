@@ -85,7 +85,7 @@ crates/zbxpatrol-cli/           # 壳
 ```bash
 cargo build                   # debug
 cargo build --release         # release (~40s)
-cargo test -p zbxpatrol-core # 24 个单元测试
+cargo test -p zbxpatrol-core # 27 个单元测试
 cargo clippy --all-targets   # 零警告
 ```
 
