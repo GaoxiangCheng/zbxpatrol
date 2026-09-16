@@ -254,7 +254,7 @@ impl ZabbixClient {
             params["filter"] = json!({ "host": names });
         }
         let v = self.call("host.get", params).await?;
-        Ok(parse_array(&v, |h| {
+        let mut hosts = parse_array(&v, |h| {
             let ip = h["interfaces"]
                 .as_array()
                 .and_then(|ifs| ifs.iter().find(|i| !i["ip"].as_str().unwrap_or("").is_empty()))
@@ -276,7 +276,42 @@ impl ZabbixClient {
                     })
                     .unwrap_or_default(),
             }
-        }))
+        });
+        // 兼容兜底：部分 Zabbix 7.4 环境 host.get selectGroups 不返回 groups（实测 extend 也不返回），
+        // 此时用 hostgroup.get(selectHosts) 反查成员关系补齐
+        if hosts.iter().any(|h| h.groups.is_empty()) {
+            if let Ok(gv) = self.call(
+                "hostgroup.get",
+                json!({
+                    "output": ["groupid","name"],
+                    "selectHosts": ["hostid"],
+                    "limit": 500,
+                }),
+            )
+            .await
+            {
+                use std::collections::HashMap;
+                let mut membership: HashMap<String, Vec<String>> = HashMap::new();
+                for g in parse_array(&gv, |g| g.clone()) {
+                    let gname = g["name"].as_str().unwrap_or_default().to_string();
+                    if let Some(hs) = g["hosts"].as_array() {
+                        for h in hs {
+                            if let Some(hid) = h["hostid"].as_str() {
+                                membership.entry(hid.to_string()).or_default().push(gname.clone());
+                            }
+                        }
+                    }
+                }
+                for h in &mut hosts {
+                    if h.groups.is_empty() {
+                        if let Some(names) = membership.get(&h.hostid) {
+                            h.groups = names.clone();
+                        }
+                    }
+                }
+            }
+        }
+        Ok(hosts)
     }
 
     pub async fn get_items(&self, hostid: &str) -> Result<Vec<ItemRec>> {
@@ -372,21 +407,40 @@ impl ZabbixClient {
         Ok(out)
     }
 
-    pub async fn problems_get(
+    /// 区间内发生过的 problem（按开始时间过滤，含已恢复）
+    pub async fn problems_in_range(
         &self,
         from: i64,
         till: i64,
         hostids: Option<&[String]>,
     ) -> Result<Vec<ProblemRec>> {
+        self.problems_query(Some(from), Some(till), hostids).await
+    }
+
+    /// 当前未恢复的全部 problem（不带时间过滤——开始于区间之前的活跃告警也要可见）
+    pub async fn problems_open(&self, hostids: Option<&[String]>) -> Result<Vec<ProblemRec>> {
+        self.problems_query(None, None, hostids).await
+    }
+
+    async fn problems_query(
+        &self,
+        from: Option<i64>,
+        till: Option<i64>,
+        hostids: Option<&[String]>,
+    ) -> Result<Vec<ProblemRec>> {
         // Zabbix 7.x problem.get 无 selectHosts：先取问题，再经 trigger.get 映射主机
         let mut params = json!({
             "output": ["eventid","name","severity","clock","r_eventid","acknowledged","objectid"],
-            "time_from": from,
-            "time_till": till,
             "sortfield": ["eventid"],
             "sortorder": "DESC",
             "limit": 2000,
         });
+        if let Some(f) = from {
+            params["time_from"] = json!(f);
+        }
+        if let Some(t) = till {
+            params["time_till"] = json!(t);
+        }
         if let Some(h) = hostids {
             params["hostids"] = json!(h);
         }

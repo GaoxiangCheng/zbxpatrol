@@ -79,9 +79,17 @@ pub async fn run_inspection(
     }
     results.sort_by_key(|(idx, _, _)| *idx);
 
-    // 区间问题一次性拉取，按主机名关联
+    // 问题告警：当前未恢复（任意开始时间）∪ 区间内发生过（含已恢复），按 eventid 去重后按主机名关联
     let hostids: Vec<String> = results.iter().map(|(_, h, _)| h.hostid.clone()).collect();
-    let problems = client.problems_get(range.from, range.till, Some(&hostids)).await?;
+    let open = client.problems_open(Some(&hostids)).await?;
+    let in_range = client.problems_in_range(range.from, range.till, Some(&hostids)).await?;
+    let mut problems = open;
+    for p in in_range {
+        if !problems.iter().any(|x| x.eventid == p.eventid) {
+            problems.push(p);
+        }
+    }
+    problems.sort_by(|a, b| b.severity.cmp(&a.severity).then(b.clock.cmp(&a.clock)));
     let mut by_host: HashMap<String, Vec<ProblemRec>> = HashMap::new();
     for p in &problems {
         for hn in &p.hosts {
@@ -144,6 +152,9 @@ fn build_report(
         }
     }
     summary.problem_open = problems.iter().filter(|p| !p.recovered).count() as i64;
+    summary.problem_new_in_range =
+        problems.iter().filter(|p| !p.recovered && p.clock >= range.from).count() as i64;
+    summary.problem_carried_over = summary.problem_open - summary.problem_new_in_range;
     let mut top: Vec<&HostInspection> = hosts.iter().collect();
     top.sort_by_key(|h| std::cmp::Reverse(h.risk.score));
     summary.top_risk = top
@@ -572,13 +583,30 @@ async fn inspect_host(
     }
 
     // ---- 稳定性 ----
-    // 重启：优先 boottime 去重计数；无 boottime 用 uptime 跳变（均用 history）
-    let reboots = if let Some(bt) = &c.boottime {
+    // 重启：boottime 容差去重 + uptime 跳变双估计取小者；uptime 全程大于窗口时长则不可能重启
+    let reboots = if let Some(up) = &c.uptime {
+        let hist = fetch_history_map(&client, &[up], range).await?;
+        let up_samples = hist.get(&up.itemid);
+        let uptime_min = up_samples.and_then(|s| s.iter().map(|x| x.value).reduce(f64::min));
+        if let Some(umin) = uptime_min {
+            if umin > (range.till - range.from) as f64 {
+                // 窗口内 uptime 始终大于窗口本身 → 期间不可能发生过重启
+                Some(0)
+            } else if let Some(bt) = &c.boottime {
+                let hist = fetch_history_map(&client, &[bt], range).await?;
+                hist.get(&bt.itemid).and_then(|s| reboots_from_boottime(s))
+            } else {
+                up_samples.and_then(|s| reboots_from_uptime(s))
+            }
+        } else if let Some(bt) = &c.boottime {
+            let hist = fetch_history_map(&client, &[bt], range).await?;
+            hist.get(&bt.itemid).and_then(|s| reboots_from_boottime(s))
+        } else {
+            None
+        }
+    } else if let Some(bt) = &c.boottime {
         let hist = fetch_history_map(&client, &[bt], range).await?;
         hist.get(&bt.itemid).and_then(|s| reboots_from_boottime(s))
-    } else if let Some(up) = &c.uptime {
-        let hist = fetch_history_map(&client, &[up], range).await?;
-        hist.get(&up.itemid).and_then(|s| reboots_from_uptime(s))
     } else {
         None
     };

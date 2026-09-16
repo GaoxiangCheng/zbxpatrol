@@ -1,6 +1,7 @@
 //! 子命令实现（CLI / 交互向导 / HTTP serve 共用）。
 //! 约定：数据走 stdout，日志与进度走 stderr；错误返回退出码（2/3）。
 
+use crate::lang::t;
 use crate::render;
 use crate::Format;
 use futures::StreamExt;
@@ -55,7 +56,7 @@ pub async fn ensure_config() -> Result<()> {
     let save_path = zbxpatrol_core::env::home_config_path().ok_or_else(|| {
         PatrolError::Config("无法确定家目录（HOME 未设置），请改用环境变量".into())
     })?;
-    println!("未检测到 Zabbix 连接配置，进入首次初始化（将保存到 {}）", save_path.display());
+    println!("{}", format!("{}（{} {}）", t("No Zabbix connection config found, entering first-run setup", "未检测到 Zabbix 连接配置，进入首次初始化"), t("saved to", "将保存到"), save_path.display()));
     let url: String = Input::new()
         .with_prompt("Zabbix 地址（如 https://zabbix.example.com）")
         .validate_with(|v: &String| if v.starts_with("http") { Ok(()) } else { Err("需以 http(s):// 开头") })
@@ -110,7 +111,7 @@ pub async fn ensure_config() -> Result<()> {
         use std::os::unix::fs::PermissionsExt;
         let _ = std::fs::set_permissions(&save_path, std::fs::Permissions::from_mode(0o600));
     }
-    println!("✓ 连接验证成功（{} 个主机群组），配置已保存：{}", groups.len(), save_path.display());
+    println!("✓ {}（{} {}），{} {}", t("Connection verified", "连接验证成功"), groups.len(), t("host groups", "个主机群组"), t("config saved to", "配置已保存"), save_path.display());
     Ok(())
 }
 
@@ -148,26 +149,26 @@ pub async fn do_check(fmt: Format) -> i32 {
     let mut steps: Vec<(String, bool, String)> = Vec::new();
     let mut fail_code = 0;
     match client.api_version().await {
-        Ok(v) => steps.push((format!("连接 {}", cfg.url), true, format!("Zabbix API 版本 {v}"))),
+        Ok(v) => steps.push((format!("{} {}", t("Connect", "连接"), cfg.url), true, format!("Zabbix API 版本 {v}"))),
         Err(e) => {
-            steps.push((format!("连接 {}", cfg.url), false, e.to_string()));
+            steps.push((format!("{} {}", t("Connect", "连接"), cfg.url), false, e.to_string()));
             fail_code = 3;
         }
     }
     if fail_code == 0 {
         match client.login().await {
-            Ok(_) => steps.push(("登录（ZBX_USER/ZBX_PASSWORD）".into(), true, "认证成功".into())),
+            Ok(_) => steps.push((t("Login (ZBX_USER/ZBX_PASSWORD)", "登录（ZBX_USER/ZBX_PASSWORD）").into(), true, t("authenticated", "认证成功").into())),
             Err(e) => {
-                steps.push(("登录（ZBX_USER/ZBX_PASSWORD）".into(), false, e.to_string()));
+                steps.push((t("Login (ZBX_USER/ZBX_PASSWORD)", "登录（ZBX_USER/ZBX_PASSWORD）").into(), false, e.to_string()));
                 fail_code = 2;
             }
         }
     }
     if fail_code == 0 {
         match client.get_hosts(None, None).await {
-            Ok(hs) => steps.push(("数据读取权限".into(), true, format!("可见主机 {} 台", hs.len()))),
+            Ok(hs) => steps.push((t("Data read permission", "数据读取权限").into(), true, format!("{} {}", t("visible hosts", "可见主机"), hs.len()))),
             Err(e) => {
-                steps.push(("数据读取权限".into(), false, e.to_string()));
+                steps.push((t("Data read permission", "数据读取权限").into(), false, e.to_string()));
                 fail_code = 3;
             }
         }
@@ -188,7 +189,7 @@ pub async fn do_check(fmt: Format) -> i32 {
             eprintln!(" {mark} {s}  {d}");
         }
         if fail_code == 0 {
-            eprintln!("自检通过：环境就绪。");
+            eprintln!("{}", t("Self-check passed: environment ready.", "自检通过：环境就绪。"));
         }
     }
     fail_code
@@ -229,12 +230,50 @@ pub async fn do_groups(search: Option<String>, page: Option<usize>, size: Option
         Ok(groups) => {
             let (groups, truncated) = filter_page(groups, search.as_deref(), page, size, |g| g.name.clone());
             if truncated && fmt == Format::Table {
-                eprintln!("（已分页，更多结果请用 --page/--size）");
+                eprintln!("{}", t("(paged, more results with --page/--size)", "（已分页，更多结果请用 --page/--size）"));
             }
             render::groups(&groups, fmt);
             0
         }
         Err(e) => die(e),
+    }
+}
+
+/// hosts 子命令：主机列表（系统类型/IP/群组；过滤与分页）
+pub async fn do_hosts(
+    group: Option<String>,
+    search: Option<String>,
+    page: Option<usize>,
+    size: Option<usize>,
+    fmt: Format,
+) -> i32 {
+    let (cfg, client) = match connect().await {
+        Ok(v) => v,
+        Err(e) => return die(e),
+    };
+    let scope = match &group {
+        Some(g) => Scope::Groups(vec![g.clone()]),
+        None => Scope::All,
+    };
+    let r = zbxpatrol_core::discovery::resolve_hosts(&client, &scope).await;
+    match r {
+        Ok(hosts) => {
+            let (mut hosts, truncated) =
+                filter_page(hosts, search.as_deref(), page, size, |h| {
+                    format!("{} {} {}", h.host, h.name, h.ip)
+                });
+            fetch_os_family(&client, &mut hosts, cfg.concurrency).await;
+            client.logout().await;
+            if truncated && fmt == Format::Table {
+                eprintln!("{}", t("(paged, more results with --page/--size)", "（已分页，更多结果请用 --page/--size）"));
+            }
+            render::hosts_list(&hosts, fmt);
+            0
+        }
+        Err(e) => {
+            client.logout().await;
+            die(e)
+        }
     }
 }
 
@@ -377,9 +416,9 @@ _zbxpatrol() {
     local subopts=""
     case "$sub" in
         groups)    subopts="--search --page --size" ;;
+        hosts)     subopts="--group --search --page --size" ;;
         items)     subopts="--host --group --search --detail" ;;
-        query)     subopts="--key --host --group --hosts --period --last --from --to --csv" ;;
-        chart)     subopts="--host --metric --key --period --last --from --to" ;;
+        query)     subopts="--key --host --group --hosts --period --last --from --to --csv --chart" ;;
         report)    subopts="--group --host --hosts --strictness --all-items --raw --data-json --out --config --period --last --from --to" ;;
         serve)     subopts="--listen --token" ;;
     esac
@@ -407,7 +446,7 @@ _zbxpatrol() {
         --lang)
             COMPREPLY=($(compgen -W "en zh" -- "$cur")); return 0 ;;
         --key)
-            # Complete item keys based on --host or --hosts for chart/query
+            # Complete item keys based on --host or --hosts for query --chart
             local h="" j
             for ((j=1; j<COMP_CWORD; j++)); do
                 if [ "${COMP_WORDS[j]}" = "--host" ] || [ "${COMP_WORDS[j]}" = "--hosts" ]; then h="${COMP_WORDS[j+1]}"; fi
@@ -425,7 +464,7 @@ _zbxpatrol() {
 
     # Level 1: subcommand completion
     if [ "$COMP_CWORD" -eq 1 ]; then
-        local subs="check serve groups items query chart report completions"
+        local subs="check serve groups items query report completions"
         COMPREPLY=($(compgen -W "$subs" -- "$cur"))
         return 0
     fi
@@ -448,12 +487,12 @@ const ZSH_COMPLETION: &str = r#"#compdef zbxpatrol
 # zbxpatrol zsh completion (dynamic group/host/item names; filters used options)
 _zbxpatrol() {
     local -a subs
-    subs=(check serve groups items query chart report completions)
+    subs=(check serve groups items query report completions)
     if (( CURRENT == 2 )); then
         _describe 'command' subs
         return
     fi
-    local sub="$words[1]"
+    local sub="$words[2]"
     case $words[CURRENT-1] in
         --group)
             local -a gs
@@ -504,9 +543,9 @@ _zbxpatrol() {
     opts=(--format --lang --quiet --no-interactive --verbose --help)
     case "$sub" in
         groups) opts+=(--search --page --size) ;;
+        hosts)  opts+=(--group --search --page --size) ;;
         items)  opts+=(--host --group --search --detail) ;;
-        query)  opts+=(--key --host --group --hosts --period --last --from --to --csv) ;;
-        chart)  opts+=(--host --metric --key --period --last --from --to) ;;
+        query)  opts+=(--key --host --group --hosts --period --last --from --to --csv --chart) ;;
         report) opts+=(--group --host --hosts --strictness --all-items --raw --data-json --out --config --period --last --from --to) ;;
         serve)  opts+=(--listen --token) ;;
     esac
@@ -518,10 +557,19 @@ _zbxpatrol "$@"
 
 pub fn do_completions(shell: &str) -> i32 {
     match shell {
-        "zsh" => println!("{ZSH_COMPLETION}"),
-        _ => println!("{BASH_COMPLETION}"),
+        "zsh" => {
+            println!("{ZSH_COMPLETION}");
+            0
+        }
+        "bash" => {
+            println!("{BASH_COMPLETION}");
+            0
+        }
+        other => {
+            eprintln!("zbxpatrol: 不支持的 shell {other:?}（仅支持 bash | zsh）");
+            2
+        }
     }
-    0
 }
 
 // ---------- 趋势图 ----------
@@ -539,6 +587,11 @@ pub async fn do_chart(host: String, metric: String, key: Option<String>, spec: T
     client.logout().await;
     match r {
         Ok(s) => {
+            if fmt == Format::Csv {
+                return die(PatrolError::Config(
+                    "chart 不支持 csv 输出（支持 table | json）".into(),
+                ));
+            }
             if fmt == Format::Json {
                 println!(
                     "{}",
@@ -631,8 +684,16 @@ pub async fn items_aggregated_data(scope: &Scope, filter: &str) -> Result<Vec<It
     Ok(rows)
 }
 
-/// 单主机逐条明细（含当前值）
+/// 单主机逐条明细（含当前值）；numeric_only=true 仅返回数值型（出图/巡检用）
 pub async fn items_detail_data(host: &str, filter: &str) -> Result<Vec<ItemDetailRow>> {
+    items_detail_data_opt(host, filter, false).await
+}
+
+pub async fn items_detail_data_opt(
+    host: &str,
+    filter: &str,
+    numeric_only: bool,
+) -> Result<Vec<ItemDetailRow>> {
     let (_cfg, client) = connect().await?;
     let hosts = client.get_hosts(None, Some(&[host.to_string()])).await?;
     let Some(h) = hosts.first() else {
@@ -644,6 +705,7 @@ pub async fn items_detail_data(host: &str, filter: &str) -> Result<Vec<ItemDetai
     let fl = filter.to_lowercase();
     Ok(items
         .into_iter()
+        .filter(|it| !numeric_only || it.numeric())
         .filter(|it| {
             fl.is_empty()
                 || it.key.to_lowercase().contains(&fl)
@@ -679,7 +741,7 @@ pub async fn do_items(
             _ => None,
         };
         let Some(h) = h else {
-            eprintln!("--detail 需要配合 --host 使用");
+            eprintln!("{}", t("--detail requires --host", "--detail 需要配合 --host 使用"));
             return 2;
         };
         match items_detail_data(&h, &filter).await {
@@ -712,6 +774,7 @@ pub async fn do_items(
 
 pub async fn do_query(
     keys: Vec<String>,
+    chart: bool,
     scope: Scope,
     spec: TimeSpec,
     csv: Option<PathBuf>,
@@ -726,7 +789,7 @@ pub async fn do_query(
         Err(e) => return die(e),
     };
     let r = pipeline::run_query(client.clone(), &scope, &keys, &range, cfg.concurrency).await;
-    client.logout().await;
+    // 登出统一推迟到输出分支（--chart 需要复用会话再取一次序列）
     let rows = match r {
         Ok(rows) => rows,
         Err(e) => return die(e),
@@ -735,10 +798,51 @@ pub async fn do_query(
         if let Err(e) = render::query_csv_file(&rows, &path) {
             return die(PatrolError::Config(format!("CSV 写入失败：{e}")));
         }
-        eprintln!("CSV 已写入 {}", path.display());
+        eprintln!("{} {}", t("CSV written to", "CSV 已写入"), path.display());
+    }
+    if fmt == Format::Csv {
+        render::query_csv_stdout(&rows);
+        client.logout().await;
+        return 0;
+    }
+    // --chart 与 json/csv 输出互斥（全尺寸图只面向终端）
+    if chart && fmt != Format::Table {
+        client.logout().await;
+        return die(PatrolError::Config("--chart 只支持终端表格输出（去掉 --format json/csv）".into()));
     }
     render::query(&rows, &range, fmt);
-    0
+    if chart {
+        match rows.len() {
+            1 => {
+                let sr = pipeline::host_metric_series(
+                    client.clone(),
+                    &rows[0].host,
+                    "",
+                    &range,
+                    72,
+                    Some(&rows[0].key),
+                )
+                .await;
+                client.logout().await;
+                match sr {
+                    Ok(series) => {
+                        render::ascii_chart(&series.title, &series.unit, &series.series, &range.fmt_from(), &range.fmt_till());
+                        0
+                    }
+                    Err(e) => die(e),
+                }
+            }
+            n => {
+                client.logout().await;
+                die(PatrolError::Config(format!(
+                    "--chart 需要唯一命中系列，当前命中 {n} 个；请用 --host 或更精确的 --key 收窄"
+                )))
+            }
+        }
+    } else {
+        client.logout().await;
+        0
+    }
 }
 
 // ---------- report ----------
@@ -801,7 +905,7 @@ pub async fn do_report(p: ReportParams) -> i32 {
         return die(e);
     }
     if !p.quiet {
-        eprintln!("巡检范围：{}   时间区间：{}", p.scope.label(), range.fmt_human());
+        eprintln!("{}: {}   {}: {}", t("Scope", "巡检范围"), p.scope.label(), t("Range", "时间区间"), range.fmt_human());
     }
     let host_count = {
         match zbxpatrol_core::discovery::resolve_hosts(&client, &p.scope).await {
@@ -839,14 +943,17 @@ pub async fn do_report(p: ReportParams) -> i32 {
     };
     let data = &outcome.data;
 
+    // CSV 附加导出（--csv / 向导输出选择），console_only 与常规路径均生效
+    if let Some(csvp) = &p.csv_out {
+        if let Err(e) = render::report_csv_file(data, csvp) {
+            return die(PatrolError::Config(format!("CSV 写入失败：{e}")));
+        }
+    }
+
     // console_only：不生成 xlsx，仅控制台输出（可选 CSV/JSON 附加导出）
     if p.console_only {
         if let Some(csvp) = &p.csv_out {
-            if let Err(e) = render::report_csv_file(data, csvp) {
-                eprintln!("zbxpatrol: CSV 写入失败：{e}");
-            } else {
-                println!("CSV 文件 : {}", csvp.display());
-            }
+            println!("CSV 文件 : {}", csvp.display());
         }
         if let Some(dj) = &p.data_json {
             let j = serde_json::to_string_pretty(data).unwrap_or_default();

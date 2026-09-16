@@ -278,7 +278,14 @@ pub struct Summary {
     pub missing_data: i64,
     pub risk_dist: RiskDist,
     pub top_risk: Vec<TopRisk>,
+    /// 当前未恢复告警总数（含开始于区间之前的遗留告警）
     pub problem_open: i64,
+    /// 其中开始于区间之内的新增告警数
+    #[serde(default)]
+    pub problem_new_in_range: i64,
+    /// 其中开始于区间之前的遗留告警数
+    #[serde(default)]
+    pub problem_carried_over: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

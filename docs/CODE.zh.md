@@ -92,7 +92,7 @@
 
 <a id="reboot"></a>
 ### 4.5 重启检测
-优先 `system.boottime` 去重计数−1（每次开机值唯一）；无 boottime 用 `system.uptime` 序列向下跳变计数。
+`system.boottime` 排序后按相邻差值做 **300 秒容差去重**再计数−1（agent 时钟校准会使 boottime 每日漂移数秒，精确去重会误报重启）；并与 `system.uptime` 交叉验证：窗口内 uptime 最小值大于窗口时长则不可能重启（直接 0），否则取 boottime 估计与 uptime 跳变估计的较小者。
 
 <a id="forecast"></a>
 ### 4.6 满盘预测（区间 >7 天）
@@ -140,7 +140,7 @@
 <a id="tests"></a>
 ## 7. 测试与构建
 
-- **单元测试 24 项**（`cargo test`）：时间解析/时区、history 聚合、trend 加权、分桶与取反、计数器差分与回绕、重启检测、回归与满盘预测、三档阈值逐项对照与行为、规则正则（真实环境 key 样本）、OS 推导、TOML 解析；
+- **单元测试 27 项**（`cargo test`）：时间解析/时区、history 聚合、trend 加权、分桶与取反、计数器差分与回绕、重启检测、回归与满盘预测、三档阈值逐项对照与行为、规则正则（真实环境 key 样本）、OS 推导、TOML 解析；
 - **质量门**：`cargo fmt`、`cargo clippy --all-targets -D warnings` 零警告；
 - **构建**：`cargo build --release`（本机）；Linux 产物 `cargo zigbuild --release --target x86_64-unknown-linux-musl`（或 aarch64），`deploy/Dockerfile` 提供容器构建。
 

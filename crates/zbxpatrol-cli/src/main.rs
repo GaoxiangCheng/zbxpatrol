@@ -118,7 +118,23 @@ enum Command {
         size: Option<usize>,
     },
 
-    /// List monitoring item keys (aggregated across hosts; --detail for per-item)
+    /// List hosts (system type, IP, groups; filter and paginate)
+    Hosts {
+        /// Filter by group name
+        #[arg(long)]
+        group: Option<String>,
+        /// Filter by host/IP substring
+        #[arg(long)]
+        search: Option<String>,
+        /// Page number (1-based; requires --size)
+        #[arg(long)]
+        page: Option<usize>,
+        /// Page size (items per page)
+        #[arg(long)]
+        size: Option<usize>,
+    },
+
+    /// Discover available item keys (aggregated across hosts; --detail for per-host current values)
     Items {
         /// Filter by single host
         #[arg(long)]
@@ -134,11 +150,15 @@ enum Command {
         detail: bool,
     },
 
-    /// Query stats (cur/avg/max/min + trend sparkline) for any item key(s)
+    /// Historical stats + full-size plot for item keys (use `items` to discover keys)
+    #[command(after_help = "Examples:\n  zbxpatrol query --key system.cpu.util --last 7d\n  zbxpatrol query --key 'net.if*' --group <group> --csv out.csv\n  zbxpatrol query --host <host> --key system.cpu.util --last 24h --chart   # table + full-size plot\n\nUse `items --search <word>` to discover keys. cpu/mem/disk presets:\n  zbxpatrol query --host <host> --key system.cpu.util|vm.memory.util --chart")]
     Query {
         /// Item key (repeatable; supports wildcards like net.if*)
         #[arg(long = "key", required = true)]
         keys: Vec<String>,
+        /// Also draw a full-size trend chart; requires the query to match exactly ONE series
+        #[arg(long)]
+        chart: bool,
         #[command(flatten)]
         scope: ScopeArgs,
         #[command(flatten)]
@@ -148,21 +168,7 @@ enum Command {
         csv: Option<PathBuf>,
     },
 
-    /// Show a single-host trend chart (requires --host; no --group)
-    #[command(after_help = "Examples:\n  zbxpatrol chart --host <host> --metric cpu --last 7d\n  zbxpatrol chart --host <host> --key 'net.if.in[\"ens3\"]' --from 2026-09-01 --to 2026-09-15\n  zbxpatrol chart --host <host> --key 'vfs.fs*pused*' --last 24h   # wildcard must match exactly one")]
-    Chart {
-        /// Host name
-        #[arg(long)]
-        host: String,
-        /// Preset metric: cpu | mem | disk (mutually exclusive with --key)
-        #[arg(long, default_value = "cpu")]
-        metric: String,
-        /// Any item key (wildcard ok, must match exactly one; overrides --metric)
-        #[arg(long)]
-        key: Option<String>,
-        #[command(flatten)]
-        time: TimeArgs,
-    },
+    /// Full-size trend plot for a single host+key (deep-dive; use `query` to compare across hosts)
 
     /// Generate shell completion scripts (bash/zsh; --group/--host complete real names)
     #[command(after_help = "Install:\n\nbash:\n  zbxpatrol completions bash | sudo tee /etc/bash_completion.d/zbxpatrol\n  source /etc/bash_completion.d/zbxpatrol\n\nzsh (Kali/Ubuntu default):\n  mkdir -p ~/.zfunc\n  zbxpatrol completions zsh > ~/.zfunc/_zbxpatrol\n  echo 'fpath=(~/.zfunc $fpath)' >> ~/.zshrc\n  echo 'autoload -Uz compinit && compinit' >> ~/.zshrc\n  exec zsh\n\nVerify: zbxpatrol <TAB>")]
@@ -197,12 +203,18 @@ enum Command {
         /// Include an "All Items" sheet with every numeric item
         #[arg(long)]
         all_items: bool,
+        /// Extra custom metrics to append (comma-separated keys, wildcards ok) → dedicated sheet
+        #[arg(long = "keys", value_delimiter = ',')]
+        keys: Vec<String>,
         /// Export raw history samples (one row per data point)
         #[arg(long)]
         raw: bool,
         /// Also save structured JSON to this file
         #[arg(long = "data-json")]
         data_json: Option<PathBuf>,
+        /// Also save a flat CSV to this file
+        #[arg(long = "csv")]
+        csv_out: Option<PathBuf>,
         /// Output directory (default: ./reports)
         #[arg(long, default_value = "./reports")]
         out: PathBuf,
@@ -218,7 +230,7 @@ enum Command {
     version,
     about = "Zabbix server inspection & reporting tool (run without subcommand for interactive wizard)",
     disable_help_subcommand = true,
-    after_help = "Commands:\n  check        Connectivity, credentials and permission self-check\n  serve        Start local HTTP API server\n  groups       List host groups (search, paginate)\n  items        List monitoring item keys (by host or group)\n  query        Get stats for any item key(s) — cur/avg/max/min + trend sparkline\n  chart        Show single-host metric trend chart (ASCII)\n  report       Generate inspection report (Excel + console + JSON/CSV)\n  completions  Generate shell completion (bash/zsh)\n\nRun without subcommand for interactive wizard.\n\nExit codes: 0 OK | 2 config/credentials | 3 network/API | 4 partial data missing\nData on stdout, logs on stderr. Non-TTY auto-disables interaction.\nEach subcommand has -h with examples."
+    after_help = "Run without subcommand for interactive wizard.\n\nExit codes: 0 OK | 2 config/credentials | 3 network/API | 4 partial data missing\nData on stdout, logs on stderr. Non-TTY auto-disables interaction.\nEach subcommand has -h with examples."
 )]
 struct Cli {
     #[command(subcommand)]
@@ -292,36 +304,32 @@ async fn run(cli: Cli) -> i32 {
         Check => actions::do_check(fmt).await,
         Serve { listen, token } => serve::run(&listen, token).await,
         Groups { search, page, size } => actions::do_groups(search, page, size, fmt).await,
+        Hosts { group, search, page, size } => {
+            actions::do_hosts(group, search, page, size, fmt).await
+        }
         
         Completions { shell } => actions::do_completions(shell.as_deref().unwrap_or("bash")),
         Complete { kind, host, group } => actions::do_complete(&kind, host.as_deref(), group.as_deref()).await,
-        Chart { host, metric, key, time } => match time.spec() {
-            Ok(spec) => actions::do_chart(host, metric, key, spec, fmt).await,
-            Err(e) => {
-                eprintln!("zbxpatrol: {e}");
-                2
-            }
-        },
         Items { host, group, search, detail } => {
             actions::do_items(host, group, search, detail, fmt).await
         }
-        Query { keys, scope, time, csv } => match time.spec() {
-            Ok(spec) => actions::do_query(keys, scope.scope(), spec, csv, fmt).await,
+        Query { keys, chart, scope, time, csv } => match time.spec() {
+            Ok(spec) => actions::do_query(keys, chart, scope.scope(), spec, csv, fmt).await,
             Err(e) => {
                 eprintln!("zbxpatrol: {e}");
                 2
             }
         },
-        Report { scope, time, strictness, all_items, raw, data_json, out, patrol_config } => match time.spec() {
+        Report { scope, time, strictness, all_items, keys, raw, data_json, csv_out, out, patrol_config } => match time.spec() {
             Ok(spec) => {
                 actions::do_report(actions::ReportParams {
                     scope: scope.scope(),
                     time: spec,
                     strictness: strictness.clone(),
                     all_items,
-                    extra_keys: vec![],
+                    extra_keys: keys,
                     data_json,
-                    csv_out: None,
+                    csv_out,
                     out,
                     patrol_config,
                     fmt,

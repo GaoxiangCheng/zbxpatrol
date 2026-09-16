@@ -48,13 +48,51 @@ fn map_err(e: PatrolError) -> Response {
 
 // ---------- 请求体 ----------
 
+/// 嵌套时间对象（与 README/openapi 文档一致）；与平铺 period/last/from/to 不可同时提供
+#[derive(Deserialize, Default, Clone)]
+struct TimeBody {
+    period: Option<String>,
+    last: Option<String>,
+    from: Option<String>,
+    to: Option<String>,
+}
+
+impl TimeBody {
+    fn into_spec(self) -> Result<TimeSpec, PatrolError> {
+        if self.from.is_some() {
+            return Ok(TimeSpec::FromTo { from: self.from.clone().unwrap(), to: self.to.clone() });
+        }
+        if let Some(l) = &self.last {
+            return Ok(TimeSpec::Last(l.clone()));
+        }
+        match self.period.as_deref() {
+            None => Err(PatrolError::Config(
+                "time 对象为空（需 period/last/from+to 至少一项）".into(),
+            )),
+            Some(p) => Ok(TimeSpec::Period(match p {
+                "day" => Period::Day,
+                "week" => Period::Week,
+                "month" => Period::Month,
+                "year" => Period::Year,
+                other => {
+                    return Err(PatrolError::Config(format!(
+                        "未知 period {other:?}（支持 day|week|month|year）"
+                    )))
+                }
+            })),
+        }
+    }
+}
+
 #[derive(Deserialize, Default)]
 struct ApiReq {
     /// 群组名
     group: Option<String>,
     /// 主机名列表
     hosts: Option<Vec<String>>,
-    /// 时间：period=day|week|month|year / last="48h" / from+to
+    /// 嵌套时间对象：{"time":{"last":"7d"}}（与 openapi 一致）
+    time: Option<TimeBody>,
+    /// 时间（平铺写法）：period=day|week|month|year / last="48h" / from+to
     period: Option<String>,
     last: Option<String>,
     from: Option<String>,
@@ -80,6 +118,14 @@ impl ApiReq {
         }
     }
     fn spec(&self) -> Result<TimeSpec, PatrolError> {
+        if let Some(t) = &self.time {
+            if self.period.is_some() || self.last.is_some() || self.from.is_some() || self.to.is_some() {
+                return Err(PatrolError::Config(
+                    "time 对象与平铺 period/last/from/to 不可同时提供".into(),
+                ));
+            }
+            return t.clone().into_spec();
+        }
         if self.from.is_some() {
             return Ok(TimeSpec::FromTo { from: self.from.clone().unwrap(), to: self.to.clone() });
         }
@@ -110,6 +156,15 @@ struct ItemsParams {
 }
 
 // ---------- handlers ----------
+
+async fn not_found() -> Response {
+    err_resp(404, 0, "未知端点（可用：/health /groups /hosts /items /query /report）".into())
+}
+
+/// 统一 JSON 解析失败响应（替代 axum 默认纯文本）
+fn bad_json(e: axum::extract::rejection::JsonRejection) -> Response {
+    err_resp(400, 2, format!("请求体 JSON 非法：{e}"))
+}
 
 async fn health(State(st): State<Arc<AppState>>) -> Response {
     match st.client.api_version().await {
@@ -206,12 +261,23 @@ async fn items(State(st): State<Arc<AppState>>, Query(p): Query<ItemsParams>) ->
     ok_json(&rows)
 }
 
-async fn query(State(st): State<Arc<AppState>>, Json(req): Json<ApiReq>) -> Response {
+async fn query(
+    State(st): State<Arc<AppState>>,
+    body: Result<Json<ApiReq>, axum::extract::rejection::JsonRejection>,
+) -> Response {
+    let Json(req) = match body {
+        Ok(b) => b,
+        Err(e) => return bad_json(e),
+    };
     let keys = match req.keys.clone() {
         Some(k) if !k.is_empty() => k,
         _ => return err_resp(400, 2, "keys 不能为空（示例 {\"keys\":[\"system.cpu.util\"]}）".into()),
     };
-    let range = match TimeRange::resolve(&req.spec().unwrap_or(TimeSpec::Period(Period::Day)), st.cfg.tz()) {
+    let spec = match req.spec() {
+        Ok(s) => s,
+        Err(e) => return err_resp(400, 2, e.to_string()),
+    };
+    let range = match TimeRange::resolve(&spec, st.cfg.tz()) {
         Ok(r) => r,
         Err(e) => return err_resp(400, 2, e.to_string()),
     };
@@ -226,8 +292,12 @@ async fn report(
     State(st): State<Arc<AppState>>,
     headers: HeaderMap,
     Query(params): Query<std::collections::HashMap<String, String>>,
-    Json(req): Json<ApiReq>,
+    body: Result<Json<ApiReq>, axum::extract::rejection::JsonRejection>,
 ) -> Response {
+    let Json(req) = match body {
+        Ok(b) => b,
+        Err(e) => return bad_json(e),
+    };
     let spec = match req.spec() {
         Ok(s) => s,
         Err(e) => return err_resp(400, 2, e.to_string()),
@@ -387,6 +457,20 @@ pub async fn run(listen: &str, token: Option<String>) -> i32 {
         .ok()
         .and_then(|s| PatrolToml::load_str(&s).ok())
         .unwrap_or_default();
+    // 安全约束：未设 token 时拒绝绑定非回环地址（所有端点免鉴权，不能暴露到外部）
+    if token.is_none() {
+        let host = listen.rsplit_once(':').map(|(h, _)| h).unwrap_or(listen);
+        let external = match host.parse::<std::net::IpAddr>() {
+            Ok(ip) => !ip.is_loopback(),
+            Err(_) => host != "localhost", // 主机名非 localhost 视为对外
+        };
+        if external {
+            eprintln!(
+                "zbxpatrol: 拒绝启动：未设置 --token 时仅允许绑定回环地址（当前 {listen}）。对外暴露必须配置 --token。"
+            );
+            return 2;
+        }
+    }
     let state = Arc::new(AppState { cfg: cfg.clone(), client, token, patrol });
     let app = Router::new()
         .route("/health", get(health))
@@ -395,6 +479,7 @@ pub async fn run(listen: &str, token: Option<String>) -> i32 {
         .route("/items", get(items))
         .route("/query", post(query))
         .route("/report", post(report))
+        .fallback(not_found)
         .layer(axum::middleware::from_fn_with_state(state.clone(), auth_mw))
         .with_state(state);
     let listener = match tokio::net::TcpListener::bind(listen).await {

@@ -72,6 +72,25 @@ isnum "$AVG" && ok "/query stats.avg numeric: $AVG" || bad "/query avg bad: $(he
 SRC=$(jq_ "$T/q.json" data 0 stats source)
 { [ "$SRC" = "history" ] || [ "$SRC" = "trend" ]; } && ok "/query source=$SRC" || bad "/query source=$SRC"
 
+# 嵌套 time 对象（与文档一致）必须生效：7d 应使用 trend 且点数远多于 24h
+printf '{"keys":["system.cpu.util"],"hosts":["%s"],"time":{"last":"7d"}}' "$H" > "$T/q7.body"
+req "$T/q7.json" "$T/q7.st" POST "$BASE/query" -H "Content-Type: application/json" --data-binary "@$T/q7.body"
+{ [ "$(jq_ "$T/q7.st" "")" = "200" ] || [ "$(cat "$T/q7.st")" = "200" ]; } && ok "/query nested time:{last:7d} http 200" || bad "/query nested time http $(cat "$T/q7.st")"
+
+# 非法 period 必须报 400（不得静默回退默认区间）
+printf '{"keys":["system.cpu.util"],"hosts":["%s"],"period":"hour"}' "$H" > "$T/qbad.body"
+req "$T/qbad.json" "$T/qbad.st" POST "$BASE/query" -H "Content-Type: application/json" --data-binary "@$T/qbad.body"
+[ "$(cat "$T/qbad.st")" = "400" ] && ok "/query invalid period -> 400" || bad "/query invalid period -> $(cat "$T/qbad.st") (expect 400)"
+
+# time 对象与平铺参数混用必须报 400
+printf '{"keys":["system.cpu.util"],"hosts":["%s"],"time":{"last":"7d"},"last":"24h"}' "$H" > "$T/qmix.body"
+req "$T/qmix.json" "$T/qmix.st" POST "$BASE/query" -H "Content-Type: application/json" --data-binary "@$T/qmix.body"
+[ "$(cat "$T/qmix.st")" = "400" ] && ok "/query time+flat mixed -> 400" || bad "/query time+flat mixed -> $(cat "$T/qmix.st") (expect 400)"
+
+# 非法 JSON 必须返回统一信封
+req "$T/qraw.json" "$T/qraw.st" POST "$BASE/query" -H "Content-Type: application/json" --data-binary '{bad'
+grep -q '"ok":false' "$T/qraw.json" && ok "/query invalid json -> envelope" || bad "/query invalid json: $(head -c 120 "$T/qraw.json")"
+
 # ---------- 6. /report JSON 结构 ----------
 printf '{"hosts":["%s"],"time":{"last":"24h"},"strictness":"standard","keys":["system.cpu.util*"]}' "$H" > "$T/r.body"
 req "$T/r.json" "$T/r.st" POST "$BASE/report" -H "Content-Type: application/json" --data-binary "@$T/r.body"

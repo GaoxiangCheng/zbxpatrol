@@ -8,7 +8,7 @@
 
 1. [Install & configuration](#setup) (3-layer priority)
 2. [Global flags & exit codes](#global)
-3. [Subcommands](#cmds) — [check](#check) · [groups](#groups) · [items](#items) · [query](#query) · [chart](#chart) · [report](#report) · [serve](#serve) · [completions](#completions) · [__complete](#dunder)
+3. [Subcommands](#cmds) — [check](#check) · [groups](#groups) · [hosts](#hosts) · [items](#items) · [query](#query) · [report](#report) · [serve](#serve) · [completions](#completions) · [__complete](#dunder)
 4. [Time formats](#time) · [Scope & wildcards](#scope)
 5. [Shell completion](#bash)
 6. [Scheduling & deployment](#cron)
@@ -65,8 +65,15 @@ zbxpatrol groups [--search <substr>] [--page N] [--size N]
 `--search` name filter; `--page` (1-based, default 1) + `--size` pagination (`--size` alone = page 1).
 
 <a id="hosts"></a>
+### 3.3 hosts — list hosts
+
+```bash
+zbxpatrol hosts [--group <group>] [--search <substring>] [--page <N> --size <N>] [--format json|csv]
+```
+Columns: host, visible name, IP, OS, groups. `--search` matches host/visible-name/IP substring; pagination same as `groups`.
+
 <a id="items"></a>
-### 3.3 items — item catalog
+### 3.4 items — item catalog
 
 ```bash
 zbxpatrol items [--host <host>|--group <group>] [--search <substr>] [--detail]
@@ -74,26 +81,23 @@ zbxpatrol items [--host <host>|--group <group>] [--search <substr>] [--detail]
 Aggregated by key (key/name/unit/type/host-count) by default; `--detail` (with `--host`) lists rows incl. current values.
 
 <a id="query"></a>
-### 3.4 query — stats for arbitrary items
+### 3.5 query — stats + plot for arbitrary items
 
 ```bash
-zbxpatrol query --key <K> [--key <K2>…] [scope] [time] [--csv <file>] [--format json]
+zbxpatrol query --key <K> [--key <K2>…] [scope] [time] [--csv <file>] [--chart] [--format json]
 ```
 - keys support `*` wildcards (e.g. `net.if*`); repeat `--key` or comma-separate;
+- `--chart`: after the table, appends a full-size trend plot (72 buckets, Y scale + avg line) for the **single matched** series; with multiple series matched it exits with code 2 asking to narrow via `--host`/exact `--key`; mutually exclusive with `--format json/csv`;
 - outputs cur/avg/max/min + **trend sparkline** (when ≤30 items matched);
 - `--csv` saves a CSV (UTF-8 BOM, opens in Excel).
 
 <a id="chart"></a>
-### 3.5 chart — single-host trend chart (ASCII)
+### 3.6 Plotting — via `query --chart`
 
-```bash
-zbxpatrol chart --host <host> --metric cpu|mem|disk [time]
-zbxpatrol chart --host <host> --key <item-key-or-wildcard> [time]   # any item; wildcard must match exactly one
-```
-Y-axis scale, average dotted line, time axis, min/avg/max summary; `--format json` returns the series.
+Full-size trend plots are produced by `query --chart` (see 3.5): run a query, and when it matches exactly one series the table is followed by a 72-bucket ASCII plot with Y-axis scale, average line and time axis. The standalone `chart` subcommand was removed in v1.2.0.
 
 <a id="report"></a>
-### 3.6 report — inspection report (core)
+### 3.7 report — inspection report (core)
 
 ```bash
 zbxpatrol report [scope] [time] [--strictness loose|standard|strict]
@@ -108,7 +112,7 @@ zbxpatrol report [scope] [time] [--strictness loose|standard|strict]
 - Output: xlsx (`巡检报告_<from>-<to>_<scope>.xlsx`, conditional coloring) + console color table (default with `--format table`); `--format csv` prints flat CSV; `--data-json` saves structured JSON.
 
 <a id="serve"></a>
-### 3.7 serve — local HTTP API
+### 3.8 serve — local HTTP API
 
 ```bash
 zbxpatrol serve --listen 127.0.0.1:8787 [--token <TOKEN>]
@@ -116,7 +120,7 @@ zbxpatrol serve --listen 127.0.0.1:8787 [--token <TOKEN>]
 See the [API doc](API.en.md).
 
 <a id="completions"></a>
-### 3.8 completions — emit shell completion
+### 3.9 completions — emit shell completion
 
 ```bash
 zbxpatrol completions bash | sudo tee /etc/bash_completion.d/zbxpatrol
@@ -125,7 +129,7 @@ zbxpatrol completions zsh > ~/.zfunc/_zbxpatrol
 ```
 
 <a id="dunder"></a>
-### 3.9 __complete (hidden) — completion data source
+### 3.10 __complete (hidden) — completion data source
 
 ```bash
 zbxpatrol __complete groups                # group names
@@ -164,7 +168,7 @@ After installing [3.9](#completions):
 | `zbxpatrol items <TAB>` | all options of that subcommand |
 | `items --group <TAB>` | **real group names** from Zabbix |
 | `--group <value> <TAB>` | remaining options (keeps going) |
-| `chart --host <host> --key <TAB>` | **real item keys of that host** (prefix-filtered) |
+| `query --chart <TAB>` | plot flag (completions offer it for `query`) |
 | `--metric/--period/--strictness/--format <TAB>` | enum values |
 
 [↑ TOC](#toc)

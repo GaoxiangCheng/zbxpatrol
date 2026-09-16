@@ -19,17 +19,57 @@ fn mk_table() -> Table {
 pub fn groups(groups: &[GroupRec], fmt: Format) {
     match fmt {
         Format::Json => println!("{}", serde_json::to_string_pretty(groups).unwrap()),
-        _ => {
-            let mut t = mk_table();
-            t.set_header(vec!["群组ID", "群组名称"]);
+        Format::Csv => {
+            println!("\u{FEFF}groupid,name");
             for g in groups {
-                t.add_row(vec![&g.groupid, &g.name]);
+                println!("{},{}", g.groupid, csv_escape(&g.name));
             }
-            println!("{t}");
+        }
+        _ => {
+            let mut tbl = mk_table();
+            tbl.set_header(vec![t("Group ID", "群组ID"), t("Group Name", "群组名称")]);
+            for g in groups {
+                tbl.add_row(vec![&g.groupid, &g.name]);
+            }
+            println!("{tbl}");
         }
     }
 }
 
+
+/// 主机列表（hosts 子命令；含系统类型与群组）
+pub fn hosts_list(hosts: &[zbxpatrol_core::types::HostInfo], fmt: Format) {
+    match fmt {
+        Format::Json => println!("{}", serde_json::to_string_pretty(hosts).unwrap()),
+        Format::Csv => {
+            println!("\u{FEFF}host,name,ip,os,groups");
+            for h in hosts {
+                println!(
+                    "{},{},{},{},{}",
+                    csv_escape(&h.host),
+                    csv_escape(&h.name),
+                    h.ip,
+                    csv_escape(&h.os_family),
+                    csv_escape(&h.groups.join("|"))
+                );
+            }
+        }
+        _ => {
+            let mut tbl = mk_table();
+            tbl.set_header(vec![t("Host", "主机"), t("Visible Name", "可见名"), t("IP", "IP"), t("OS", "系统"), t("Groups", "群组")]);
+            for h in hosts {
+                tbl.add_row(vec![
+                    &h.host,
+                    &h.name,
+                    &h.ip,
+                    &h.os_family,
+                    &h.groups.join("|"),
+                ]);
+            }
+            println!("{tbl}");
+        }
+    }
+}
 
 // ---------- 趋势图 ----------
 
@@ -61,14 +101,14 @@ pub fn ascii_chart(title: &str, unit: &str, series: &[Option<f64>], from_label: 
     const H: usize = 14;
     let vals: Vec<f64> = series.iter().filter_map(|v| *v).collect();
     if vals.is_empty() || series.is_empty() {
-        println!("{title}：区间内无数据");
+        println!("{title}: {}", t("no data in range", "区间内无数据"));
         return;
     }
     let min = vals.iter().cloned().fold(f64::MAX, f64::min);
     let max = vals.iter().cloned().fold(f64::MIN, f64::max);
     let span = (max - min).max(1e-9);
     let avg = vals.iter().sum::<f64>() / vals.len() as f64;
-    println!("{title}  [{unit}]  最小 {min:.1} / 平均 {avg:.1} / 最大 {max:.1}");
+    println!("{title}  [{unit}]  {}: {min:.1} / {}: {avg:.1} / {}: {max:.1}", t("min","最小"), t("avg","平均"), t("max","最大"));
     let lvl = |v: f64| -> usize { (((v - min) / span * (H - 1) as f64).round() as usize).min(H - 1) };
     let avg_lvl = lvl(avg);
     for row in (0..H).rev() {
@@ -106,13 +146,19 @@ pub fn ascii_chart(title: &str, unit: &str, series: &[Option<f64>], from_label: 
 pub fn items_aggregated(rows: &[(String, String, String, String, usize)], fmt: Format) {
     match fmt {
         Format::Json => println!("{}", serde_json::to_string_pretty(rows).unwrap()),
-        _ => {
-            let mut t = mk_table();
-            t.set_header(vec!["key", "名称", "单位", "类型", "覆盖主机数"]);
+        Format::Csv => {
+            println!("\u{FEFF}key,name,unit,value_type,hosts");
             for (k, n, u, v, c) in rows {
-                t.add_row(vec![k, n, u, v, &c.to_string()]);
+                println!("{},{},{},{},{}", csv_escape(k), csv_escape(n), u, v, c);
             }
-            println!("{t}");
+        }
+        _ => {
+            let mut tbl = mk_table();
+            tbl.set_header(vec!["key", t("Name","名称"), t("Unit","单位"), t("Type","类型"), t("Hosts Covered","覆盖主机数")]);
+            for (k, n, u, v, c) in rows {
+                tbl.add_row(vec![k, n, u, v, &c.to_string()]);
+            }
+            println!("{tbl}");
         }
     }
 }
@@ -120,13 +166,19 @@ pub fn items_aggregated(rows: &[(String, String, String, String, usize)], fmt: F
 pub fn items_detail(rows: &[(String, String, String, String, String)], fmt: Format) {
     match fmt {
         Format::Json => println!("{}", serde_json::to_string_pretty(rows).unwrap()),
-        _ => {
-            let mut t = mk_table();
-            t.set_header(vec!["主机", "key", "名称", "当前值", "单位"]);
+        Format::Csv => {
+            println!("\u{FEFF}host,key,name,lastvalue,units");
             for r in rows {
-                t.add_row(vec![&r.0, &r.1, &r.2, &r.3, &r.4]);
+                println!("{},{},{},{},{}", csv_escape(&r.0), csv_escape(&r.1), csv_escape(&r.2), csv_escape(&r.3), csv_escape(&r.4));
             }
-            println!("{t}");
+        }
+        _ => {
+            let mut tbl = mk_table();
+            tbl.set_header(vec![t("Host","主机"), "key", t("Name","名称"), t("Last Value","当前值"), t("Unit","单位")]);
+            for r in rows {
+                tbl.add_row(vec![&r.0, &r.1, &r.2, &r.3, &r.4]);
+            }
+            println!("{tbl}");
         }
     }
 }
@@ -135,12 +187,12 @@ pub fn query(rows: &[QueryRow], range: &TimeRange, fmt: Format) {
     match fmt {
         Format::Json => println!("{}", serde_json::to_string_pretty(rows).unwrap()),
         _ => {
-            eprintln!("查询区间：{}", range.fmt_human());
-            let mut t = mk_table();
-            t.set_header(vec!["主机", "key", "当前", "平均", "最大", "最小", "趋势", "单位", "来源"]);
+            eprintln!("{}: {}", t("Query range","查询区间"), range.fmt_human());
+            let mut tbl = mk_table();
+            tbl.set_header(vec![t("Host","主机"), "key", t("Cur","当前"), t("Avg","平均"), t("Max","最大"), t("Min","最小"), t("Trend","趋势"), t("Unit","单位"), t("Source","来源")]);
             for r in rows {
                 let spark = r.trend.as_ref().map(|s| sparkline(s)).unwrap_or_else(|| "—".into());
-                t.add_row(vec![
+                tbl.add_row(vec![
                     &r.host,
                     &r.key,
                     &fmt_opt(r.stats.cur),
@@ -152,8 +204,28 @@ pub fn query(rows: &[QueryRow], range: &TimeRange, fmt: Format) {
                     &r.stats.source,
                 ]);
             }
-            println!("{t}");
+            println!("{tbl}");
         }
+    }
+}
+
+pub fn query_csv_stdout(rows: &[QueryRow]) {
+    print!("\u{FEFF}");
+    for (i, r) in rows.iter().enumerate() {
+        if i == 0 {
+            println!("host,key,cur,avg,max,min,unit,source");
+        }
+        println!(
+            "{},{},{},{},{},{},{},{}",
+            r.host,
+            csv_escape(&r.key),
+            opt_csv(r.stats.cur),
+            opt_csv(r.stats.avg),
+            opt_csv(r.stats.max),
+            opt_csv(r.stats.min),
+            csv_escape(&r.stats.unit),
+            r.stats.source
+        );
     }
 }
 
@@ -199,11 +271,11 @@ pub fn report_summary(data: &ReportData, xlsx_path: Option<&std::path::Path>, da
     if zh {
         println!("主机     : {} 台（可用 {} / 不可达 {} / 数据缺失 {}）", s.host_total, s.available, s.unavailable, s.missing_data);
         println!("风险分布 : 健康 {} | 低危 {} | 中危 {} | 高危 {} | 严重 {}", s.risk_dist.healthy, s.risk_dist.low, s.risk_dist.medium, s.risk_dist.high, s.risk_dist.critical);
-        println!("未恢复问题: {} 个", s.problem_open);
+        println!("未恢复问题: {} 个（区间内新增 {}，区间前遗留 {}）", s.problem_open, s.problem_new_in_range, s.problem_carried_over);
     } else {
         println!("Hosts     : {} (up {} / down {} / missing {})", s.host_total, s.available, s.unavailable, s.missing_data);
         println!("Risk dist : Healthy {} | Low {} | Medium {} | High {} | Critical {}", s.risk_dist.healthy, s.risk_dist.low, s.risk_dist.medium, s.risk_dist.high, s.risk_dist.critical);
-        println!("Open problems: {}", s.problem_open);
+        println!("Open problems: {} (new in range {}, carried over {})", s.problem_open, s.problem_new_in_range, s.problem_carried_over);
     }
     if !s.top_risk.is_empty() && s.top_risk[0].score > 0 {
         println!("{}:", t("Top Risk Hosts", "TOP 风险主机"));
@@ -265,9 +337,9 @@ pub fn report_console_detail(data: &ReportData) {
         row.push(comfy_table::Cell::new(&h.host.ip));
         row.push(comfy_table::Cell::new(if h.os_family.is_empty() { "—" } else { &h.os_family }));
         row.push(if h.available {
-            comfy_table::Cell::new("正常").fg(Color::Green)
+            comfy_table::Cell::new(t("Up", "正常")).fg(Color::Green)
         } else {
-            comfy_table::Cell::new("不可达").fg(Color::Red)
+            comfy_table::Cell::new(t("Down", "不可达")).fg(Color::Red)
         });
         row.push(quad(&h.metrics.cpu));
         row.push(comfy_table::Cell::new(
@@ -313,8 +385,8 @@ pub fn report_console_detail(data: &ReportData) {
 
 fn scope_label(data: &ReportData) -> String {
     match data.scope_type.as_str() {
-        "all" => "全部主机".to_string(),
-        "group" => format!("群组 {}", data.scope_names.join("、")),
+        "all" => t("All hosts", "全部主机").to_string(),
+        "group" => format!("{} {}", t("Group", "群组"), data.scope_names.join("、")),
         _ => data.scope_names.join("、"),
     }
 }
@@ -336,13 +408,10 @@ fn report_csv_content(data: &ReportData) -> String {
 
 /// 主机明细 CSV 内容（不含 BOM；serve 流式/落盘复用）
 pub fn report_csv_string(data: &ReportData) -> String {
+    // CSV 表头固定英文（供程序/Excel 消费，语言无关）
     let zh = crate::lang::is_zh();
     let mut out = String::from("\u{FEFF}");
-    if zh {
-        out.push_str("主机,IP,群组,可用性,风险分,风险等级,CPU当前%,CPU平均%,CPU最大%,CPU最小%,内存当前%,内存平均%,内存最大%,内存最小%,磁盘最满分区,磁盘当前%,磁盘平均%,磁盘最大%,磁盘最小%,主要风险点\n");
-    } else {
-        out.push_str("Host,IP,Group,Status,Score,Level,CPU cur%,CPU avg%,CPU max%,CPU min%,Mem cur%,Mem avg%,Mem max%,Mem min%,Disk (fullest),Disk cur%,Disk avg%,Disk max%,Disk min%,Risk Points\n");
-    }
+    out.push_str("Host,IP,Group,Status,Score,Level,CPU cur%,CPU avg%,CPU max%,CPU min%,Mem cur%,Mem avg%,Mem max%,Mem min%,Disk (fullest),Disk cur%,Disk avg%,Disk max%,Disk min%,Risk Points\n");
     for h in &data.hosts {
         let disk = h.metrics.disk_max.as_ref();
         let level = if zh { h.risk.level.clone() } else { bilingual::risk_level(&h.risk.level) };

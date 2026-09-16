@@ -90,7 +90,7 @@ Cumulative counters (NIC bytes etc.): adjacent `Δv/Δt` for rates; errors/drops
 
 <a id="reboot"></a>
 ### 4.5 Reboot detection
-Prefer `system.boottime` distinct-count − 1 (unique per boot); fallback: downward jumps of `system.uptime`.
+Boottime distinct-count − 1 with a **300 s drift tolerance** on adjacent sorted values (agent clock calibration makes boottime creep seconds per day — exact dedup reported false reboots); cross-checked against `system.uptime`: if the uptime minimum exceeds the window length no reboot is possible (→ 0); otherwise take the smaller of the boottime and uptime-jump estimates.
 
 <a id="forecast"></a>
 ### 4.6 Disk-full forecast (ranges > 7 days)
@@ -138,7 +138,7 @@ Baseline B (loose 90 / standard 80 / strict 70) is the high-risk line:
 <a id="tests"></a>
 ## 7. Tests & build
 
-- **24 unit tests** (`cargo test`): time parsing/timezone, history aggregation, trend weighting, bucketing & inversion, counter deltas & wraps, reboot detection, regression & forecast, per-tier threshold conformance & behavior, rule regexes (real-world key samples), OS derivation, TOML parsing;
+- **27 unit tests** (`cargo test`): time parsing/timezone, history aggregation, trend weighting, bucketing & inversion, counter deltas & wraps, reboot detection, regression & forecast, per-tier threshold conformance & behavior, rule regexes (real-world key samples), OS derivation, TOML parsing;
 - **Quality gates**: `cargo fmt`, `cargo clippy --all-targets -D warnings` — zero warnings;
 - **Build**: `cargo build --release` (native); Linux artifacts via `cargo zigbuild --release --target x86_64-unknown-linux-musl` (or aarch64); container build in `deploy/Dockerfile`.
 

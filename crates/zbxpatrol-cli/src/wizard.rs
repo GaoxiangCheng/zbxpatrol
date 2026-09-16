@@ -426,7 +426,7 @@ async fn host_menu(ed: &mut Editor<CandHelper, rustyline::history::DefaultHistor
 
 async fn items_view(ed: &mut Editor<CandHelper, rustyline::history::DefaultHistory>, host: &str, path: &str) -> Pick {
     println!("{}", t("  Loading items…", "  正在加载监控项…"));
-    let Ok(rows) = actions::items_detail_data(host, "").await else {
+    let Ok(rows) = actions::items_detail_data_opt(host, "", true).await else {
         println!("{}", t("  Load failed", "  加载失败"));
         return Pick::Back;
     };

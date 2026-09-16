@@ -9,8 +9,8 @@
 1. [安装与配置](#setup)（三层配置优先级）
 2. [全局参数与退出码](#global)
 3. [子命令详解](#cmds)
-   - [check](#check) · [groups](#groups) · [items](#items) · [query](#query)
-   - [chart](#chart) · [report](#report) · [serve](#serve) · [completions](#completions) · [__complete](#dunder)
+   - [check](#check) · [groups](#groups) · [hosts](#hosts) · [items](#items) · [query](#query)
+   - [report](#report) · [serve](#serve) · [completions](#completions) · [__complete](#dunder)
 4. [时间参数格式](#time) · [范围参数与通配符](#scope)
 5. [Shell 补全安装](#bash)（多级 Tab 补全真实数据）
 6. [定时任务与部署](#cron)
@@ -67,7 +67,15 @@ zbxpatrol groups [--search <子串>] [--page N] [--size N]
 `--search` 名称过滤；`--page`（1 起，缺省 1）+ `--size` 分页（只给 `--size` 即第 1 页）。
 
 <a id="hosts"></a>
-### 3.3 items — 监控项清单
+### 3.3 hosts — 主机列表
+
+```bash
+zbxpatrol hosts [--group <群组名>] [--search <子串>] [--page <N> --size <N>] [--format json|csv]
+```
+列：主机、可见名、IP、系统类型、群组；`--search` 匹配主机/可见名/IP 子串；分页用法同 `groups`。
+
+<a id="items"></a>
+### 3.4 items — 监控项清单
 
 ```bash
 zbxpatrol items [--host <主机名>|--group <群组名>] [--search <子串>] [--detail]
@@ -75,26 +83,23 @@ zbxpatrol items [--host <主机名>|--group <群组名>] [--search <子串>] [--
 默认按 key 聚合（key/名称/单位/类型/覆盖主机数）；`--detail` 需配合 `--host` 逐条列出（含当前值）。
 
 <a id="query"></a>
-### 3.4 query — 任意监控项统计
+### 3.5 query — 任意监控项统计与绘图
 
 ```bash
-zbxpatrol query --key <K> [--key <K2>…] [范围] [时间] [--csv <文件>] [--format json]
+zbxpatrol query --key <K> [--key <K2>…] [范围] [时间] [--csv <文件>] [--chart] [--format json]
 ```
 - key 支持 `*` 通配（如 `net.if*`）；可重复 `--key` 或逗号分隔；
+- `--chart`：表格输出后，对**唯一命中**的系列追加全尺寸趋势图（72 列，Y 轴刻度+均值线）；命中多个系列时退出码 2 并提示用 `--host`/精确 `--key` 收窄；与 `--format json/csv` 互斥；
 - 输出 当前/平均/最大/最小 + **趋势火花线**（命中 ≤30 项时）；
 - `--csv` 另存 CSV（UTF-8 BOM，Excel 直开）。
 
 <a id="chart"></a>
-### 3.5 chart — 单主机趋势图（ASCII）
+### 3.6 绘图 — 由 `query --chart` 提供
 
-```bash
-zbxpatrol chart --host <主机名> --metric cpu|mem|disk [时间]
-zbxpatrol chart --host <主机名> --key <监控项key或通配> [时间]   # 任意监控项，通配须唯一命中
-```
-Y 轴刻度、均值虚线、时间轴、最小/平均/最大摘要；`--format json` 输出序列数据。
+全尺寸趋势图通过 `query --chart` 输出（见 3.5）：查询唯一命中一个系列时，表格后自动追加 72 列 ASCII 大图（Y 轴刻度、均值线、时间轴）。独立 `chart` 子命令已在 v1.2.0 移除。
 
 <a id="report"></a>
-### 3.6 report — 巡检报表（核心）
+### 3.7 report — 巡检报表（核心）
 
 ```bash
 zbxpatrol report [范围] [时间] [--strictness loose|standard|strict]
@@ -109,7 +114,7 @@ zbxpatrol report [范围] [时间] [--strictness loose|standard|strict]
 - 输出：xlsx（`巡检报告_<起>-<止>_<范围>.xlsx`，条件格式着色）+ 控制台彩色明细表（`--format table` 默认）；`--format csv` 输出平面 CSV；`--data-json` 另存结构化 JSON。
 
 <a id="serve"></a>
-### 3.7 serve — 本地 HTTP API
+### 3.8 serve — 本地 HTTP API
 
 ```bash
 zbxpatrol serve --listen 127.0.0.1:8787 [--token <TOKEN>]
@@ -117,7 +122,7 @@ zbxpatrol serve --listen 127.0.0.1:8787 [--token <TOKEN>]
 详见 [API 文档](API.zh.md)。
 
 <a id="completions"></a>
-### 3.8 completions — 生成 Shell 补全脚本
+### 3.9 completions — 生成 Shell 补全脚本
 
 ```bash
 zbxpatrol completions bash | sudo tee /etc/bash_completion.d/zbxpatrol
@@ -126,7 +131,7 @@ zbxpatrol completions zsh > ~/.zfunc/_zbxpatrol
 ```
 
 <a id="dunder"></a>
-### 3.9 __complete（隐藏）— 补全数据源
+### 3.10 __complete（隐藏）— 补全数据源
 
 ```bash
 zbxpatrol __complete groups              # 群组名
