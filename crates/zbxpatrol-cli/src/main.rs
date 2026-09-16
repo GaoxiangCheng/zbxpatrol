@@ -150,8 +150,8 @@ enum Command {
         detail: bool,
     },
 
-    /// Historical stats for item keys (cur/avg/max/min + sparkline; use `items` to discover keys)
-    #[command(after_help = "Examples:\n  zbxpatrol query --key system.cpu.util --last 7d\n  zbxpatrol query --key 'net.if*' --group <group> --csv out.csv\n  zbxpatrol query --host <host> --key system.cpu.util --last 24h --chart   # table + full-size plot\n\nUse `items --search <word>` to discover keys; use `chart` for preset cpu/mem/disk plots.")]
+    /// Historical stats + full-size plot for item keys (use `items` to discover keys)
+    #[command(after_help = "Examples:\n  zbxpatrol query --key system.cpu.util --last 7d\n  zbxpatrol query --key 'net.if*' --group <group> --csv out.csv\n  zbxpatrol query --host <host> --key system.cpu.util --last 24h --chart   # table + full-size plot\n\nUse `items --search <word>` to discover keys. cpu/mem/disk presets:\n  zbxpatrol query --host <host> --key system.cpu.util|vm.memory.util --chart")]
     Query {
         /// Item key (repeatable; supports wildcards like net.if*)
         #[arg(long = "key", required = true)]
@@ -169,20 +169,6 @@ enum Command {
     },
 
     /// Full-size trend plot for a single host+key (deep-dive; use `query` to compare across hosts)
-    #[command(after_help = "Examples:\n  zbxpatrol chart --host <host> --metric cpu --last 7d\n  zbxpatrol chart --host <host> --key 'net.if.in[\"ens3\"]' --from 2026-09-01 --to 2026-09-15\n  zbxpatrol chart --host <host> --key 'vfs.fs*pused*' --last 24h   # wildcard must match exactly one")]
-    Chart {
-        /// Host name
-        #[arg(long)]
-        host: String,
-        /// Preset metric: cpu | mem | disk (mutually exclusive with --key)
-        #[arg(long, default_value = "cpu")]
-        metric: String,
-        /// Any item key (wildcard ok, must match exactly one; overrides --metric)
-        #[arg(long)]
-        key: Option<String>,
-        #[command(flatten)]
-        time: TimeArgs,
-    },
 
     /// Generate shell completion scripts (bash/zsh; --group/--host complete real names)
     #[command(after_help = "Install:\n\nbash:\n  zbxpatrol completions bash | sudo tee /etc/bash_completion.d/zbxpatrol\n  source /etc/bash_completion.d/zbxpatrol\n\nzsh (Kali/Ubuntu default):\n  mkdir -p ~/.zfunc\n  zbxpatrol completions zsh > ~/.zfunc/_zbxpatrol\n  echo 'fpath=(~/.zfunc $fpath)' >> ~/.zshrc\n  echo 'autoload -Uz compinit && compinit' >> ~/.zshrc\n  exec zsh\n\nVerify: zbxpatrol <TAB>")]
@@ -324,13 +310,6 @@ async fn run(cli: Cli) -> i32 {
         
         Completions { shell } => actions::do_completions(shell.as_deref().unwrap_or("bash")),
         Complete { kind, host, group } => actions::do_complete(&kind, host.as_deref(), group.as_deref()).await,
-        Chart { host, metric, key, time } => match time.spec() {
-            Ok(spec) => actions::do_chart(host, metric, key, spec, fmt).await,
-            Err(e) => {
-                eprintln!("zbxpatrol: {e}");
-                2
-            }
-        },
         Items { host, group, search, detail } => {
             actions::do_items(host, group, search, detail, fmt).await
         }

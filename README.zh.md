@@ -27,13 +27,12 @@
 - **查询指标**：列表挑 key 或直接输入（通配），同范围连续查询；
 - 连通性自检。
 
-非交互（CLI）与交互功能对等：`chart --key`、`report --keys`、`--from/--to` 自定义区间等均可脚本化；每个子命令 `-h` 附常用示例。
+非交互（CLI）与交互功能对等：`query --chart`、`report --keys`、`--from/--to` 自定义区间等均可脚本化；每个子命令 `-h` 附常用示例。
 
 巡检结果也可以直接在控制台查看彩色明细表（按风险降序，使用率绿/黄/红着色；含**系统类型列**与 **CPU/内存趋势火花线** ▁▂▃▅▆█）——不只想导出 xlsx 时：
 
 ```bash
 zbxpatrol report --group <群组名>          # 输出 xlsx 同时打印控制台明细表（--format table 默认）
-zbxpatrol chart --host <主机名> --metric mem --last 24h   # 单主机全尺寸 ASCII 趋势图（Y轴刻度+均值线）
 ```
 
 ## 命令一览
@@ -48,12 +47,9 @@ zbxpatrol groups                     # 主机群组列表（--search 过滤，--
 zbxpatrol hosts [--group X] [--search <子串>] [--size 20 --page 2]   # 主机列表（系统类型+过滤+分页）
 zbxpatrol items [--host H|--group G] [--search cpu] [--detail]  # 监控项清单
 zbxpatrol query --key "system.cpu.util" --last 7d       # 手动查询任意指标（含趋势火花线）
-zbxpatrol query --host <主机名> --key system.cpu.util --chart        # 表格 + 唯一系列的全尺寸趋势图
 zbxpatrol query --key "net.if*" --group "Web" --csv out.csv
 zbxpatrol query --host <主机名> --key system.cpu.util --chart   # 表格 + 唯一系列全尺寸趋势图
 
-zbxpatrol chart --host <主机名> --metric cpu --last 7d     # 控制台趋势图（cpu|mem|disk）
-zbxpatrol chart --host <主机名> --key 'net.if.in["ens3"]' --last 24h   # 任意监控项趋势图（支持通配）（单机深挖用 chart，多机对比用 query --chart）
 
 zbxpatrol report --group <群组名> --keys 'net.if*,proc.num'    # 报表附加自定义指标（专设 sheet）
 

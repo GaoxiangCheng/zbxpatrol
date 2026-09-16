@@ -27,13 +27,12 @@ Run `./zbxpatrol` without a subcommand to enter the **interactive wizard**: pick
 - **Metric query**: pick keys from the list or type wildcards; consecutive queries keep the same scope;
 - Connectivity self-check.
 
-Non-interactive CLI is feature-equivalent (`chart --key`, `report --keys`, `--from/--to` custom ranges…); every subcommand's `-h` ships examples.
+Non-interactive CLI is feature-equivalent (`query --chart`, `report --keys`, `--from/--to` custom ranges…); every subcommand's `-h` ships examples.
 
 Inspection results can also be viewed directly in the console as a colored table (sorted by risk, green/yellow/red utilization, **OS column** and **CPU/memory trend sparklines** ▁▂▃▅▆█):
 
 ```bash
 zbxpatrol report --group <group>          # xlsx + console detail table (default with --format table)
-zbxpatrol chart --host <host> --metric mem --last 24h   # full-size ASCII trend chart (Y scale + avg line)
 ```
 
 ## Command Overview
@@ -50,8 +49,6 @@ zbxpatrol query --key "system.cpu.util" --last 7d       # stats for any item (wi
 zbxpatrol query --key "net.if*" --group "Web" --csv out.csv
 zbxpatrol query --host <host> --key system.cpu.util --chart   # table + full-size plot of the single matched series
 
-zbxpatrol chart --host <host> --metric cpu --last 7d    # console trend chart (cpu|mem|disk)
-zbxpatrol chart --host <host> --key 'net.if.in["ens3"]' --last 24h   # any-item chart (wildcards)
 zbxpatrol report --group <group> --keys 'net.if*,proc.num'   # report + custom item sheet
 
 # inspection reports
@@ -75,7 +72,7 @@ zbxpatrol completions bash | sudo tee /etc/bash_completion.d/zbxpatrol   # bash,
 source <(zbxpatrol completions bash)                                     # session-only
 zbxpatrol completions zsh > ~/.zfunc/_zbxpatrol                          # zsh
 ```
-After install: `zbxpatrol <TAB>` lists subcommands; `items --group <TAB>` real group names; `--host <TAB>` real host names; `chart --host <host> --key <TAB>` that host's item keys; enum options complete too. `-h` output is grouped (Options / Time / Scope).
+After install: `zbxpatrol <TAB>` lists subcommands; `items --group <TAB>` real group names; `--host <TAB>` real host names; `query --chart <TAB>` plot flag; enum options complete too. `-h` output is grouped (Options / Time / Scope).
 
 **Exit codes**: 0 OK / 2 config or credentials / 3 network or API / 4 partial data missing (report still generated). Data on stdout, logs on stderr; interaction auto-disables outside a TTY.
 

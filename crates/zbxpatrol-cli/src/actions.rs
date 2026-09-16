@@ -419,7 +419,6 @@ _zbxpatrol() {
         hosts)     subopts="--group --search --page --size" ;;
         items)     subopts="--host --group --search --detail" ;;
         query)     subopts="--key --host --group --hosts --period --last --from --to --csv --chart" ;;
-        chart)     subopts="--host --metric --key --period --last --from --to" ;;
         report)    subopts="--group --host --hosts --strictness --all-items --raw --data-json --out --config --period --last --from --to" ;;
         serve)     subopts="--listen --token" ;;
     esac
@@ -447,7 +446,7 @@ _zbxpatrol() {
         --lang)
             COMPREPLY=($(compgen -W "en zh" -- "$cur")); return 0 ;;
         --key)
-            # Complete item keys based on --host or --hosts for chart/query
+            # Complete item keys based on --host or --hosts for query --chart
             local h="" j
             for ((j=1; j<COMP_CWORD; j++)); do
                 if [ "${COMP_WORDS[j]}" = "--host" ] || [ "${COMP_WORDS[j]}" = "--hosts" ]; then h="${COMP_WORDS[j+1]}"; fi
@@ -465,7 +464,7 @@ _zbxpatrol() {
 
     # Level 1: subcommand completion
     if [ "$COMP_CWORD" -eq 1 ]; then
-        local subs="check serve groups items query chart report completions"
+        local subs="check serve groups items query report completions"
         COMPREPLY=($(compgen -W "$subs" -- "$cur"))
         return 0
     fi
@@ -488,7 +487,7 @@ const ZSH_COMPLETION: &str = r#"#compdef zbxpatrol
 # zbxpatrol zsh completion (dynamic group/host/item names; filters used options)
 _zbxpatrol() {
     local -a subs
-    subs=(check serve groups items query chart report completions)
+    subs=(check serve groups items query report completions)
     if (( CURRENT == 2 )); then
         _describe 'command' subs
         return
@@ -547,7 +546,6 @@ _zbxpatrol() {
         hosts)  opts+=(--group --search --page --size) ;;
         items)  opts+=(--host --group --search --detail) ;;
         query)  opts+=(--key --host --group --hosts --period --last --from --to --csv --chart) ;;
-        chart)  opts+=(--host --metric --key --period --last --from --to) ;;
         report) opts+=(--group --host --hosts --strictness --all-items --raw --data-json --out --config --period --last --from --to) ;;
         serve)  opts+=(--listen --token) ;;
     esac
