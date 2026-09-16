@@ -2593,6 +2593,7 @@ dependencies = [
  "dotenvy",
  "futures",
  "indicatif",
+ "libc",
  "rust_xlsxwriter",
  "rustyline",
  "serde",

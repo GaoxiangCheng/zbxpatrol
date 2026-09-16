@@ -254,6 +254,9 @@ struct Cli {
 }
 
 fn main() {
+    // 管道场景（如 `... | head`）下游关闭时按 POSIX 惯例静默退出，而不是 panic
+    #[cfg(unix)]
+    unsafe { libc::signal(libc::SIGPIPE, libc::SIG_DFL); }
     // Config loading order (higher wins, never overwritten):
     //   1. process environment variables
     //   2. .env in current directory (project level)
