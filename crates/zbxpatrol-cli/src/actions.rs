@@ -415,6 +415,7 @@ _zbxpatrol() {
     local subopts=""
     case "$sub" in
         groups)    subopts="--search --page --size" ;;
+        hosts)     subopts="--group --search --page --size" ;;
         items)     subopts="--host --group --search --detail" ;;
         query)     subopts="--key --host --group --hosts --period --last --from --to --csv" ;;
         chart)     subopts="--host --metric --key --period --last --from --to" ;;
@@ -542,6 +543,7 @@ _zbxpatrol() {
     opts=(--format --lang --quiet --no-interactive --verbose --help)
     case "$sub" in
         groups) opts+=(--search --page --size) ;;
+        hosts)  opts+=(--group --search --page --size) ;;
         items)  opts+=(--host --group --search --detail) ;;
         query)  opts+=(--key --host --group --hosts --period --last --from --to --csv) ;;
         chart)  opts+=(--host --metric --key --period --last --from --to) ;;
