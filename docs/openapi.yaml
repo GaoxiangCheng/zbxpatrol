@@ -1,0 +1,405 @@
+openapi: 3.0.3
+info:
+  title: zbxpatrol API
+  version: 1.1.0
+  description: |
+    Zabbix server inspection & reporting service.
+
+    * All responses are wrapped: `{"ok": true, "data": ...}` or `{"ok": false, "error": {"code": <int>, "message": "<string>"}}`.
+    * Timezone follows `ZBX_TZ` (default Asia/Shanghai); timestamps are epoch seconds.
+    * `quad` (MetricStats) = `{cur, avg, max, min, unit, count, source, missing}` — numeric fields are nullable.
+servers:
+  - url: http://127.0.0.1:8787
+    description: local serve instance
+security:
+  - bearerAuth: []
+tags:
+  - name: meta
+  - name: catalog
+  - name: metrics
+  - name: report
+
+paths:
+  /health:
+    get:
+      tags: [meta]
+      summary: Liveness + Zabbix connectivity (no auth required)
+      security: []
+      responses:
+        "200":
+          description: OK envelope
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Ok"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          status: { type: string, example: up }
+                          zabbix: { type: string, example: "https://zabbix.example.com" }
+                          zabbix_version: { type: string, example: 7.4.14 }
+                          version: { type: string, example: 1.1.0 }
+  /groups:
+    get:
+      tags: [catalog]
+      summary: Host groups
+      responses:
+        "200":
+          description: group list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Ok"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Group" }
+  /hosts:
+    get:
+      tags: [catalog]
+      summary: Hosts (with OS family)
+      parameters:
+        - { name: group, in: query, schema: { type: string }, description: filter by group name }
+      responses:
+        "200":
+          description: host list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Ok"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Host" }
+  /items:
+    get:
+      tags: [catalog]
+      summary: Item keys aggregated
+      parameters:
+        - { name: host, in: query, schema: { type: string } }
+        - { name: group, in: query, schema: { type: string } }
+        - { name: search, in: query, schema: { type: string }, description: substring on key/name }
+      responses:
+        "200":
+          description: aggregated item rows
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Ok"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/ItemAgg" }
+  /query:
+    post:
+      tags: [metrics]
+      summary: Statistics for arbitrary item keys (wildcards allowed)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/QueryRequest" }
+            example:
+              keys: ["system.cpu.util"]
+              hosts: ["web-01"]
+              time: { last: 24h }
+      responses:
+        "200":
+          description: per-host stats (+ bucketed trend when ≤30 items matched)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Ok"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/QueryRow" }
+  /report:
+    post:
+      tags: [report]
+      summary: Inspection report
+      description: |
+        JSON by default. With `?format=xlsx` returns the Excel binary stream.
+      parameters:
+        - { name: format, in: query, schema: { type: string, enum: [json, xlsx, csv] }, description: "json (default), xlsx or csv file stream" }
+        - { name: save, in: query, schema: { type: string, enum: ["1", "true"] }, description: "when set, generate the file on the SERVER under reports/ and return {saved, file, format, summary} instead of streaming" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReportRequest" }
+            example:
+              group: "linux-servers"
+              time: { period: day }
+              strictness: strict
+              keys: ["net.if*"]
+      responses:
+        "200":
+          description: report payload (or xlsx binary when format=xlsx)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Ok"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/ReportData" }
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+            text/csv:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "502": { $ref: "#/components/responses/Error" }
+
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer }
+  responses:
+    Error:
+      description: error envelope
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Err" }
+  schemas:
+    Ok:
+      type: object
+      required: [ok, data]
+      properties:
+        ok: { type: boolean, example: true }
+        data: {}
+    Err:
+      type: object
+      required: [ok, error]
+      properties:
+        ok: { type: boolean, example: false }
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: integer, example: 2 }
+            message: { type: string }
+    Group:
+      type: object
+      properties:
+        groupid: { type: string }
+        name: { type: string }
+    Host:
+      type: object
+      properties:
+        hostid: { type: string }
+        host: { type: string }
+        name: { type: string }
+        ip: { type: string }
+        groups: { type: array, items: { type: string } }
+        os_family: { type: string, example: Linux }
+    ItemAgg:
+      type: object
+      properties:
+        key: { type: string, example: system.cpu.util }
+        name: { type: string }
+        unit: { type: string }
+        value_type: { type: integer, description: "0 float / 3 uint" }
+        hosts: { type: integer, description: number of hosts having this key }
+    TimeBody:
+      type: object
+      description: exactly one of period / last / from(+to)
+      properties:
+        period: { type: string, enum: [day, week, month, year] }
+        last: { type: string, example: 48h }
+        from: { type: string, example: "2026-09-01" }
+        to: { type: string, example: "2026-09-15 23:59" }
+    ScopeBody:
+      type: object
+      properties:
+        group: { type: string }
+        hosts: { type: array, items: { type: string } }
+    QueryRequest:
+      type: object
+      required: [keys]
+      allOf:
+        - $ref: "#/components/schemas/ScopeBody"
+        - type: object
+          properties:
+            keys: { type: array, items: { type: string } }
+            time: { $ref: "#/components/schemas/TimeBody" }
+    MetricStats:
+      type: object
+      description: quad stats; numeric fields nullable
+      properties:
+        cur: { type: number, nullable: true }
+        avg: { type: number, nullable: true }
+        max: { type: number, nullable: true }
+        min: { type: number, nullable: true }
+        unit: { type: string }
+        count: { type: integer }
+        source: { type: string, enum: [history, trend, derived, none] }
+        missing: { type: boolean }
+    QueryRow:
+      type: object
+      properties:
+        host: { type: string }
+        key: { type: string }
+        name: { type: string }
+        stats: { $ref: "#/components/schemas/MetricStats" }
+        trend:
+          type: array
+          description: up to 32 bucketed means (nullable elements)
+          items: { type: number, nullable: true }
+    ReportRequest:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/ScopeBody"
+        - type: object
+          properties:
+            time: { $ref: "#/components/schemas/TimeBody" }
+            strictness: { type: string, enum: [loose, standard, strict] }
+            all_items: { type: boolean, default: false }
+            keys: { type: array, items: { type: string }, description: extra custom item keys (wildcards) }
+    RiskDist:
+      type: object
+      properties:
+        healthy: { type: integer }
+        low: { type: integer }
+        medium: { type: integer }
+        high: { type: integer }
+        critical: { type: integer }
+    TopRisk:
+      type: object
+      properties:
+        host: { type: string }
+        score: { type: integer }
+        level: { type: string }
+    Problem:
+      type: object
+      properties:
+        eventid: { type: string }
+        name: { type: string }
+        severity: { type: integer, description: 0..5 }
+        severity_label: { type: string }
+        clock: { type: integer }
+        recovered: { type: boolean }
+        acknowledged: { type: boolean }
+        hosts: { type: array, items: { type: string } }
+    DiskStat:
+      type: object
+      properties:
+        mount: { type: string }
+        total_b: { type: number, nullable: true }
+        used_b: { type: number, nullable: true }
+        space: { $ref: "#/components/schemas/MetricStats" }
+        inode: { allOf: [{$ref: "#/components/schemas/MetricStats"}], nullable: true }
+        forecast_days: { type: number, nullable: true }
+    HostInspection:
+      type: object
+      properties:
+        host: { $ref: "#/components/schemas/Host" }
+        os: { type: string }
+        os_family: { type: string }
+        available: { type: boolean }
+        metrics:
+          type: object
+          properties:
+            cpu: { $ref: "#/components/schemas/MetricStats" }
+            mem: { $ref: "#/components/schemas/MetricStats" }
+            swap: { allOf: [{$ref: "#/components/schemas/MetricStats"}], nullable: true }
+            disk_max: { allOf: [{$ref: "#/components/schemas/DiskStat"}], nullable: true }
+            inode_max: { allOf: [{$ref: "#/components/schemas/DiskStat"}], nullable: true }
+            uptime_days: { type: number, nullable: true }
+        disks: { type: array, items: { $ref: "#/components/schemas/DiskStat" } }
+        nets:
+          type: array
+          items:
+            type: object
+            properties:
+              ifname: { type: string }
+              in_mbps: { allOf: [{$ref: "#/components/schemas/MetricStats"}], nullable: true }
+              out_mbps: { allOf: [{$ref: "#/components/schemas/MetricStats"}], nullable: true }
+              util_pct: { allOf: [{$ref: "#/components/schemas/MetricStats"}], nullable: true }
+              in_errors: { type: integer, nullable: true }
+              out_errors: { type: integer, nullable: true }
+              in_dropped: { type: integer, nullable: true }
+              out_dropped: { type: integer, nullable: true }
+        services:
+          type: array
+          items:
+            type: object
+            properties:
+              key: { type: string }
+              name: { type: string }
+              ok: { type: boolean }
+        stability:
+          type: object
+          properties:
+            reboots: { type: integer, nullable: true }
+            time_offset_s: { allOf: [{$ref: "#/components/schemas/MetricStats"}], nullable: true }
+            zombies: { allOf: [{$ref: "#/components/schemas/MetricStats"}], nullable: true }
+            fd_util: { allOf: [{$ref: "#/components/schemas/MetricStats"}], nullable: true }
+            cpu_num: { type: integer, nullable: true }
+            load1: { allOf: [{$ref: "#/components/schemas/MetricStats"}], nullable: true }
+            icmp_loss: { allOf: [{$ref: "#/components/schemas/MetricStats"}], nullable: true }
+            icmp_latency: { allOf: [{$ref: "#/components/schemas/MetricStats"}], nullable: true }
+            cert_min_days: { allOf: [{$ref: "#/components/schemas/MetricStats"}], nullable: true }
+            oom_events: { type: integer, nullable: true }
+        risk:
+          type: object
+          properties:
+            score: { type: integer }
+            level: { type: string, enum: [健康, 低危, 中危, 高危, 严重] }
+            points: { type: array, items: { type: string } }
+        problems: { type: array, items: { $ref: "#/components/schemas/Problem" } }
+        spark:
+          type: object
+          nullable: true
+          properties:
+            cpu: { type: array, items: { type: number, nullable: true } }
+            mem: { type: array, items: { type: number, nullable: true } }
+            disk: { type: array, items: { type: number, nullable: true } }
+            disk_mount: { type: string, nullable: true }
+        extra:
+          type: object
+          nullable: true
+          additionalProperties: { $ref: "#/components/schemas/MetricStats" }
+        all_items:
+          type: object
+          nullable: true
+          additionalProperties: { $ref: "#/components/schemas/MetricStats" }
+        missing_data: { type: boolean }
+    ReportData:
+      type: object
+      properties:
+        version: { type: string }
+        generated_at: { type: integer }
+        range:
+          type: object
+          properties:
+            from: { type: integer }
+            till: { type: integer }
+            tz: { type: string }
+            human: { type: string }
+        scope_type: { type: string, enum: [all, group, hosts] }
+        scope_names: { type: array, items: { type: string } }
+        strictness: { type: string }
+        summary:
+          type: object
+          properties:
+            host_total: { type: integer }
+            available: { type: integer }
+            unavailable: { type: integer }
+            missing_data: { type: integer }
+            risk_dist: { $ref: "#/components/schemas/RiskDist" }
+            top_risk: { type: array, items: { $ref: "#/components/schemas/TopRisk" } }
+            problem_open: { type: integer }
+        hosts: { type: array, items: { $ref: "#/components/schemas/HostInspection" } }
+        problems: { type: array, items: { $ref: "#/components/schemas/Problem" } }

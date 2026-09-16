@@ -1,0 +1,120 @@
+# patrol.toml — zbxpatrol business configuration (fully optional)
+#
+# Usage:
+#   CLI:   zbxpatrol report --config patrol.toml ...
+#   serve: place in working directory, auto-loaded on startup
+#
+# NOTE: Zabbix connection info (URL/user/password) is ALWAYS from environment
+#       variables (ZBX_URL/ZBX_USER/ZBX_PASSWORD), never in this file.
+#
+# Full guide: docs/SCORING.en.md (English) / docs/SCORING.zh.md (Chinese)
+
+# ═════════════════════════════════════════════════════════════════
+# Part 1: Custom Metric Rules (optional)
+# Maps custom Zabbix item keys into the report. Does NOT affect scoring.
+# ═════════════════════════════════════════════════════════════════
+#
+# Fields:
+#   id      — unique ID (overrides built-in rule with same id)
+#   pattern — key regex (Rust regex crate syntax)
+#   label   — display name shown in report
+#   unit    — unit string (optional, default: "")
+#   kind    — aggregation mode (optional, default: "raw")
+#             "util"  = utilization, goes to main table + scoring eligible
+#             "raw"   = raw value, goes to detail sheet
+#             "event" = event counter
+#
+# Examples:
+#
+# [[metrics.rules]]
+# id = "jvm_heap"
+# pattern = '^jvm\.memory\.heap\.used\.pct$'
+# label = "JVM Heap Usage"
+# unit = "%"
+# kind = "util"
+#
+# [[metrics.rules]]
+# id = "nginx_active"
+# pattern = '^nginx\.connections\.active$'
+# label = "Nginx Active Connections"
+# kind = "raw"
+
+# ═════════════════════════════════════════════════════════════════
+# Part 2: Custom Scoring Rules (optional)
+# If ANY [[scoring]] is present, the built-in scoring is FULLY REPLACED.
+# Strictness (--strictness) has no effect when custom rules are present.
+# ═════════════════════════════════════════════════════════════════
+#
+# Fields:
+#   metric    — metric path (see table below)
+#   op        — comparison: gt | gte | lt | lte | eq
+#   value     — threshold (number)
+#   points    — points added on match
+#   floor     — (optional, bool) match → minimum score 95 (critical)
+#   message   — (optional) description; {value} replaced with actual value
+#   per_count — (optional, bool) points × matched value
+#
+# Available metric paths:
+#   cpu.avg  cpu.max  mem.avg  swap.avg  disk.avg  inode.avg
+#   load1.avg  offset.max  zombies.cur  fd.cur  cert.cur
+#   icmp_loss  bw_util.max  reboots  oom  problems  availability
+#
+# Score: all matched rules sum up, capped at 100.
+# Level: 0-39 Healthy | 40-59 Low | 60-74 Medium | 75-89 High | 90-100 Critical
+#
+# Example — replace built-in CPU thresholds (from 85/75/65/50 to 80/70/60/50):
+#
+# [[scoring]]
+# metric = "cpu.avg"
+# op = "gte"
+# value = 80.0
+# points = 60
+# message = "CPU avg {value}%, critical (>=80%)"
+#
+# [[scoring]]
+# metric = "cpu.avg"
+# op = "gte"
+# value = 70.0
+# points = 45
+# message = "CPU avg {value}%, high (>=70%)"
+#
+# [[scoring]]
+# metric = "cpu.avg"
+# op = "gte"
+# value = 60.0
+# points = 30
+# message = "CPU avg {value}%, medium (>=60%)"
+#
+# [[scoring]]
+# metric = "cpu.avg"
+# op = "gte"
+# value = 50.0
+# points = 15
+# message = "CPU avg {value}%, low (>=50%)"
+#
+# Example — disk 95% is critical (floor to 95):
+# [[scoring]]
+# metric = "disk.avg"
+# op = "gte"
+# value = 95.0
+# points = 60
+# floor = true
+# message = "Disk {value}%, critical"
+#
+# Example — each reboot costs 15 points:
+# [[scoring]]
+# metric = "reboots"
+# op = "gte"
+# value = 1
+# points = 15
+# per_count = true
+# message = "{value} reboots in range"
+#
+# Example — host unreachable is always critical:
+# [[scoring]]
+# metric = "availability"
+# op = "eq"
+# value = 0
+# points = 95
+# floor = true
+# message = "Host unreachable"

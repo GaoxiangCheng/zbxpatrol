@@ -1,0 +1,28 @@
+[package]
+name = "zbxpatrol-cli"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "zbxpatrol"
+path = "src/main.rs"
+
+[dependencies]
+zbxpatrol-core = { path = "../zbxpatrol-core" }
+clap = { version = "4", features = ["derive", "env"] }
+comfy-table = "7"
+rust_xlsxwriter = "0.79"
+dialoguer = "0.11"
+indicatif = "0.17"
+rustyline = "15"
+axum = "0.7"
+dotenvy = "0.15"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+chrono = "0.4"
+chrono-tz = "0.10"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+futures = "0.3"

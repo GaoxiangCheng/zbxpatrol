@@ -1,0 +1,20 @@
+# crontab -e —— 无人值守定时巡检
+# 环境变量写在 crontab 顶部（或由 /opt/zbxpatrol/.env 提供）
+
+ZBX_URL=https://zabbix.example.com
+ZBX_USER=admin
+ZBX_PASSWORD=change-me
+ZBX_INSECURE=true
+ZBX_TZ=Asia/Shanghai
+
+# 每日 08:00 日报（全部主机）
+0 8 * * * /opt/zbxpatrol/zbxpatrol report --period day --quiet >> /var/log/zbxpatrol.log 2>&1
+
+# 每周一 08:30 周报（指定群组）
+30 8 * * 1 /opt/zbxpatrol/zbxpatrol report --group <群组名> --period week --quiet >> /var/log/zbxpatrol.log 2>&1
+
+# 每月 1 日 09:00 月报
+0 9 1 * * /opt/zbxpatrol/zbxpatrol report --period month --quiet >> /var/log/zbxpatrol.log 2>&1
+
+# 任意自定义区间（如上月整月，配合 date 计算）
+# 0 9 1 * * /opt/zbxpatrol/zbxpatrol report --from "$(date -d 'last month' +\%Y-\%m-01)" --to "$(date +\%Y-\%m-01)" --quiet >> /var/log/zbxpatrol.log 2>&1

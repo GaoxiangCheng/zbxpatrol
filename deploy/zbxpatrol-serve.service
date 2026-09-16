@@ -1,0 +1,20 @@
+# /etc/systemd/system/zbxpatrol-serve.service
+# 常驻 HTTP API（供运维平台/第三方调用）
+# 安装：cp zbxpatrol /opt/zbxpatrol/ && cp .env /opt/zbxpatrol/
+#       systemctl daemon-reload && systemctl enable --now zbxpatrol-serve
+
+[Unit]
+Description=Zabbix Patrol Report HTTP API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/zbxpatrol
+EnvironmentFile=/opt/zbxpatrol/.env
+ExecStart=/opt/zbxpatrol/zbxpatrol serve --listen 127.0.0.1:8787 --token ${PATROL_TOKEN}
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,23 @@
+# /etc/systemd/system/zbxpatrol-daily.service + zbxpatrol-daily.timer
+# 定时巡检：每日 08:00 生成日报（周报/月报复制两份改 OnCalendar 与 --period）
+# 激活：systemctl enable --now zbxpatrol-daily.timer
+
+# ---- zbxpatrol-daily.service ----
+[Unit]
+Description=Daily Zabbix inspection report
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/zbxpatrol
+EnvironmentFile=/opt/zbxpatrol/.env
+ExecStart=/opt/zbxpatrol/zbxpatrol report --period day --quiet
+# 周报示例：--period week ；月报：--period month ；全部主机即去掉 --group
+
+# ---- zbxpatrol-daily.timer ----
+# [Unit]
+# Description=Run zbxpatrol daily at 08:00
+# [Timer]
+# OnCalendar=*-*-* 08:00:00
+# Persistent=true
+# [Install]
+# WantedBy=timers.target

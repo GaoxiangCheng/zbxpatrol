@@ -1,0 +1,12 @@
+[workspace]
+resolver = "2"
+members = ["crates/zbxpatrol-core", "crates/zbxpatrol-cli"]
+
+[workspace.package]
+version = "1.1.0"
+edition = "2021"
+
+[profile.release]
+lto = "thin"        # thin LTO: much faster build, near-full optimization
+strip = true
+codegen-units = 16  # parallel codegen (1 is slow; 16 is a good balance)
