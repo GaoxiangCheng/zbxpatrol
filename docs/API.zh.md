@@ -52,6 +52,8 @@ zbxpatrol serve --listen 0.0.0.0:8787 --token <你的TOKEN>
 <a id="auth"></a>
 ### 2.1 认证
 
+> 鉴权失败（401）统一延迟 200ms 返回以抑制在线爆破；token 支持环境变量 `PATROL_TOKEN` 注入，避免命令行暴露。
+
 - 启动时未设 `--token`：不鉴权（仅建议本机使用）。
 - 设置了 `--token <TOKEN>`：除 `/health` 外所有请求必须携带请求头
   `Authorization: Bearer <TOKEN>`，否则返回 `401`。

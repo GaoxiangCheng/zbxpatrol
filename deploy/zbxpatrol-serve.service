@@ -12,7 +12,9 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=/opt/zbxpatrol
 EnvironmentFile=/opt/zbxpatrol/.env
-ExecStart=/opt/zbxpatrol/zbxpatrol serve --listen 127.0.0.1:8787 --token ${PATROL_TOKEN}
+# token 通过 EnvironmentFile 的 PATROL_TOKEN 注入（clap 自动读取环境变量），
+# 不要用 --token 命令行传参——会暴露在 ps / /proc/<pid>/cmdline
+ExecStart=/opt/zbxpatrol/zbxpatrol serve --listen 127.0.0.1:8787
 Restart=always
 RestartSec=5
 

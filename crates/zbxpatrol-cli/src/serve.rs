@@ -419,17 +419,29 @@ async fn auth_mw(
         return next.run(req).await;
     }
     let expect = format!("Bearer {}", st.token.clone().unwrap_or_default());
-    let ok = req
+    let provided = req
         .headers()
         .get(header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
-        .map(|v| v == expect)
-        .unwrap_or(false);
+        .map(|v| v.to_string());
+    let ok = provided.map(|p| ct_eq(&p, &expect)).unwrap_or(false);
     if ok {
         next.run(req).await
     } else {
+        // 鉴权失败固定延迟：在线爆破从 ~9ms/次 提高到 ~200ms/次
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         err_resp(401, 401, "未授权：需要 Authorization: Bearer <token>".into())
     }
+}
+
+/// 常数时间比较：遍历到较长一侧的末尾，不因匹配位置提前返回
+fn ct_eq(a: &str, b: &str) -> bool {
+    let (a, b) = (a.as_bytes(), b.as_bytes());
+    let mut diff = (a.len() ^ b.len()) as u8;
+    for i in 0..a.len().max(b.len()) {
+        diff |= a.get(i).unwrap_or(&0) ^ b.get(i).unwrap_or(&0);
+    }
+    diff == 0
 }
 
 // ---------- 入口 ----------

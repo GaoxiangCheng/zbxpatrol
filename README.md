@@ -127,7 +127,7 @@ Auto-discovered by key regex — **present → enabled, absent → no placeholde
 ## HTTP API (for programs)
 
 ```bash
-zbxpatrol serve --listen 127.0.0.1:8787 --token mytoken
+zbxpatrol serve --listen 127.0.0.1:8787 --token mytoken   # production: export PATROL_TOKEN=mytoken (keeps the token out of ps/cmdline)
 ```
 
 | Endpoint | Description |

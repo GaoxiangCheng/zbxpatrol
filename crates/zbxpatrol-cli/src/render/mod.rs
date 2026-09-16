@@ -217,7 +217,7 @@ pub fn query_csv_stdout(rows: &[QueryRow]) {
         }
         println!(
             "{},{},{},{},{},{},{},{}",
-            r.host,
+            csv_escape(&r.host),
             csv_escape(&r.key),
             opt_csv(r.stats.cur),
             opt_csv(r.stats.avg),
@@ -234,13 +234,13 @@ pub fn query_csv_file(rows: &[QueryRow], path: &std::path::Path) -> std::io::Res
     for r in rows {
         s.push_str(&format!(
             "{},{},{},{},{},{},{},{}\n",
-            r.host,
+            csv_escape(&r.host),
             csv_escape(&r.key),
             opt_csv(r.stats.cur),
             opt_csv(r.stats.avg),
             opt_csv(r.stats.max),
             opt_csv(r.stats.min),
-            r.stats.unit,
+            csv_escape(&r.stats.unit),
             r.stats.source,
         ));
     }
@@ -251,11 +251,17 @@ fn opt_csv(v: Option<f64>) -> String {
     v.map(|x| format!("{x:.2}")).unwrap_or_default()
 }
 
+/// CSV 单元格转义：引号/逗号包裹 + 公式注入防护。
+/// Excel/LibreOffice 会把以 = + @ 开头（或 - 后跟非数字）的单元格当公式执行，
+/// 这些内容来自 Zabbix（problem 名称/item 名称/主机名等），被监控端可影响，统一加 `'` 前缀。
 fn csv_escape(s: &str) -> String {
-    if s.contains(',') || s.contains('"') {
-        format!("\"{}\"", s.replace('"', "\"\""))
+    let needs_guard = s.starts_with(['=', '+', '@', '\t', '\r'])
+        || (s.starts_with('-') && s[1..].parse::<f64>().is_err());
+    let guarded = if needs_guard { format!("'{s}") } else { s.to_string() };
+    if guarded.contains(',') || guarded.contains('"') {
+        format!("\"{}\"", guarded.replace('"', "\"\""))
     } else {
-        s.to_string()
+        guarded
     }
 }
 
@@ -418,7 +424,7 @@ pub fn report_csv_string(data: &ReportData) -> String {
         let avail = if zh { if h.available { "正常" } else { "不可达" } } else { if h.available { "OK" } else { "Unreachable" } };
         out.push_str(&format!(
             "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n",
-            h.host.host,
+            csv_escape(&h.host.host),
             h.host.ip,
             csv_escape(&h.host.groups.join("|")),
             avail,
@@ -441,4 +447,23 @@ pub fn report_csv_string(data: &ReportData) -> String {
         ));
     }
     out
+}
+
+#[cfg(test)]
+mod csv_tests {
+    use super::csv_escape;
+    #[test]
+    fn csv_formula_injection_guard() {
+        // 含引号时先加公式前缀，再做 CSV 引号包裹
+        assert_eq!(
+            csv_escape("=HYPERLINK(\"http://x\")"),
+            "\"'=HYPERLINK(\"\"http://x\"\")\""
+        );
+        assert_eq!(csv_escape("+1+cmd"), "'+1+cmd");
+        assert_eq!(csv_escape("@SUM(1)"), "'@SUM(1)");
+        assert_eq!(csv_escape("-cmd"), "'-cmd");
+        assert_eq!(csv_escape("-1.5"), "-1.5");
+        assert_eq!(csv_escape("normal,值"), "\"normal,值\"");
+        assert_eq!(csv_escape("system.cpu.util"), "system.cpu.util");
+    }
 }

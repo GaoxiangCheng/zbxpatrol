@@ -129,7 +129,7 @@ Excel（`巡检报告_<起>-<止>_<范围>.xlsx`，条件格式绿/黄/红）：
 ## HTTP API（第三方调用）
 
 ```bash
-zbxpatrol serve --listen 127.0.0.1:8787 --token mytoken
+zbxpatrol serve --listen 127.0.0.1:8787 --token mytoken   # 生产建议：export PATROL_TOKEN=mytoken（避免 token 出现在 ps/命令行）
 ```
 
 | 端点 | 说明 |

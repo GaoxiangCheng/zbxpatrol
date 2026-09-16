@@ -48,6 +48,8 @@ zbxpatrol serve --listen 0.0.0.0:8787 --token <TOKEN>
 <a id="auth"></a>
 ### 2.1 Authentication
 
+> Failed auth (401) is delayed by 200 ms to slow online brute force; the token can be injected via the `PATROL_TOKEN` env var to keep it out of the process command line.
+
 - No `--token` at startup: auth disabled (localhost usage recommended).
 - With `--token <TOKEN>`: every request except `/health` must send
   `Authorization: Bearer <TOKEN>`, otherwise `401`.
