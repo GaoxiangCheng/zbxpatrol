@@ -86,6 +86,7 @@ Priority: `from/to` > `last` > `period`. Timezone from `ZBX_TZ` (default Asia/Sh
 
 <a id="scope"></a>
 ### 2.5 Scope parameter (optional, default = all hosts)
+When several scope parameters are given, the more specific one wins: `hosts` > `group` (matching the CLI `--host`/`--hosts` > `--group`).
 
 ```json
 {"group": "<group>"}                     // single group

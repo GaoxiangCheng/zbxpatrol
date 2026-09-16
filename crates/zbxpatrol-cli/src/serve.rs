@@ -108,11 +108,12 @@ struct ApiReq {
 }
 
 impl ApiReq {
+    /// hosts（更精确）优先于 group，与 CLI 的 --host/--hosts > --group 一致
     fn scope(&self) -> Scope {
-        if let Some(g) = &self.group {
-            Scope::Groups(vec![g.clone()])
-        } else if let Some(h) = &self.hosts {
+        if let Some(h) = &self.hosts {
             Scope::Hosts(h.clone())
+        } else if let Some(g) = &self.group {
+            Scope::Groups(vec![g.clone()])
         } else {
             Scope::All
         }

@@ -63,12 +63,12 @@ impl TimeArgs {
 
 /// Scope (--group repeatable; --host single; --hosts comma-separated; default: all)
 #[derive(clap::Args, Debug, Default)]
-#[command(next_help_heading = "Scope (default: all hosts)")]
+#[command(next_help_heading = "Scope (default: all hosts; when several are given: --host > --hosts > --group)")]
 struct ScopeArgs {
-    /// Filter by host group (repeatable)
+    /// Filter by host group (repeatable; lowest precedence)
     #[arg(long)]
     group: Vec<String>,
-    /// Single host (exact name, case-sensitive)
+    /// Single host (exact name, case-sensitive; highest precedence)
     #[arg(long)]
     host: Option<String>,
     /// Multiple hosts, comma-separated
@@ -77,13 +77,14 @@ struct ScopeArgs {
 }
 
 impl ScopeArgs {
+    /// 范围参数同时给出时按精确度取优先级：--host > --hosts > --group
     fn scope(&self) -> Scope {
-        if !self.group.is_empty() {
-            Scope::Groups(self.group.clone())
-        } else if let Some(h) = &self.host {
+        if let Some(h) = &self.host {
             Scope::Hosts(vec![h.clone()])
         } else if !self.hosts.is_empty() {
             Scope::Hosts(self.hosts.clone())
+        } else if !self.group.is_empty() {
+            Scope::Groups(self.group.clone())
         } else {
             Scope::All
         }

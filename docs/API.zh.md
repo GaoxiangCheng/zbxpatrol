@@ -92,6 +92,7 @@ zbxpatrol serve --listen 0.0.0.0:8787 --token <你的TOKEN>
 
 <a id="scope"></a>
 ### 2.5 范围参数（scope，二选一；缺省=全部主机）
+范围参数同时给出时按精确度取优先级：`hosts` > `group`（与 CLI 的 `--host`/`--hosts` > `--group` 一致）。
 
 ```json
 {"group": "<群组名>"}          // 单群组
