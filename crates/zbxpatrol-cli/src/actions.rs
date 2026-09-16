@@ -906,14 +906,17 @@ pub async fn do_report(p: ReportParams) -> i32 {
     };
     let data = &outcome.data;
 
+    // CSV 附加导出（--csv / 向导输出选择），console_only 与常规路径均生效
+    if let Some(csvp) = &p.csv_out {
+        if let Err(e) = render::report_csv_file(data, csvp) {
+            return die(PatrolError::Config(format!("CSV 写入失败：{e}")));
+        }
+    }
+
     // console_only：不生成 xlsx，仅控制台输出（可选 CSV/JSON 附加导出）
     if p.console_only {
         if let Some(csvp) = &p.csv_out {
-            if let Err(e) = render::report_csv_file(data, csvp) {
-                eprintln!("zbxpatrol: CSV 写入失败：{e}");
-            } else {
-                println!("CSV 文件 : {}", csvp.display());
-            }
+            println!("CSV 文件 : {}", csvp.display());
         }
         if let Some(dj) = &p.data_json {
             let j = serde_json::to_string_pretty(data).unwrap_or_default();
