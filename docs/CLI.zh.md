@@ -78,9 +78,10 @@ zbxpatrol items [--host <主机名>|--group <群组名>] [--search <子串>] [--
 ### 3.4 query — 任意监控项统计
 
 ```bash
-zbxpatrol query --key <K> [--key <K2>…] [范围] [时间] [--csv <文件>] [--format json]
+zbxpatrol query --key <K> [--key <K2>…] [范围] [时间] [--csv <文件>] [--chart] [--format json]
 ```
 - key 支持 `*` 通配（如 `net.if*`）；可重复 `--key` 或逗号分隔；
+- `--chart`：表格输出后，对**唯一命中**的系列追加全尺寸趋势图（72 列，Y 轴刻度+均值线）；命中多个系列时退出码 2 并提示用 `--host`/精确 `--key` 收窄；与 `--format json/csv` 互斥；
 - 输出 当前/平均/最大/最小 + **趋势火花线**（命中 ≤30 项时）；
 - `--csv` 另存 CSV（UTF-8 BOM，Excel 直开）。
 

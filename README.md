@@ -48,6 +48,8 @@ zbxpatrol groups [--search <substr>] [--size N --page N]   # list groups (filter
 zbxpatrol items [--host H|--group G] [--search cpu] [--detail]   # item catalog
 zbxpatrol query --key "system.cpu.util" --last 7d       # stats for any item (with trend sparkline)
 zbxpatrol query --key "net.if*" --group "Web" --csv out.csv
+zbxpatrol query --host <host> --key system.cpu.util --chart   # table + full-size plot of the single matched series
+
 zbxpatrol chart --host <host> --metric cpu --last 7d    # console trend chart (cpu|mem|disk)
 zbxpatrol chart --host <host> --key 'net.if.in["ens3"]' --last 24h   # any-item chart (wildcards)
 zbxpatrol report --group <group> --keys 'net.if*,proc.num'   # report + custom item sheet

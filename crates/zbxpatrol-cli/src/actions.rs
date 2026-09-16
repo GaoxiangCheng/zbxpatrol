@@ -418,7 +418,7 @@ _zbxpatrol() {
         groups)    subopts="--search --page --size" ;;
         hosts)     subopts="--group --search --page --size" ;;
         items)     subopts="--host --group --search --detail" ;;
-        query)     subopts="--key --host --group --hosts --period --last --from --to --csv" ;;
+        query)     subopts="--key --host --group --hosts --period --last --from --to --csv --chart" ;;
         chart)     subopts="--host --metric --key --period --last --from --to" ;;
         report)    subopts="--group --host --hosts --strictness --all-items --raw --data-json --out --config --period --last --from --to" ;;
         serve)     subopts="--listen --token" ;;
@@ -546,7 +546,7 @@ _zbxpatrol() {
         groups) opts+=(--search --page --size) ;;
         hosts)  opts+=(--group --search --page --size) ;;
         items)  opts+=(--host --group --search --detail) ;;
-        query)  opts+=(--key --host --group --hosts --period --last --from --to --csv) ;;
+        query)  opts+=(--key --host --group --hosts --period --last --from --to --csv --chart) ;;
         chart)  opts+=(--host --metric --key --period --last --from --to) ;;
         report) opts+=(--group --host --hosts --strictness --all-items --raw --data-json --out --config --period --last --from --to) ;;
         serve)  opts+=(--listen --token) ;;
@@ -776,6 +776,7 @@ pub async fn do_items(
 
 pub async fn do_query(
     keys: Vec<String>,
+    chart: bool,
     scope: Scope,
     spec: TimeSpec,
     csv: Option<PathBuf>,
@@ -790,7 +791,7 @@ pub async fn do_query(
         Err(e) => return die(e),
     };
     let r = pipeline::run_query(client.clone(), &scope, &keys, &range, cfg.concurrency).await;
-    client.logout().await;
+    // 登出统一推迟到输出分支（--chart 需要复用会话再取一次序列）
     let rows = match r {
         Ok(rows) => rows,
         Err(e) => return die(e),
@@ -803,10 +804,47 @@ pub async fn do_query(
     }
     if fmt == Format::Csv {
         render::query_csv_stdout(&rows);
+        client.logout().await;
         return 0;
     }
+    // --chart 与 json/csv 输出互斥（全尺寸图只面向终端）
+    if chart && fmt != Format::Table {
+        client.logout().await;
+        return die(PatrolError::Config("--chart 只支持终端表格输出（去掉 --format json/csv）".into()));
+    }
     render::query(&rows, &range, fmt);
-    0
+    if chart {
+        match rows.len() {
+            1 => {
+                let sr = pipeline::host_metric_series(
+                    client.clone(),
+                    &rows[0].host,
+                    "",
+                    &range,
+                    72,
+                    Some(&rows[0].key),
+                )
+                .await;
+                client.logout().await;
+                match sr {
+                    Ok(series) => {
+                        render::ascii_chart(&series.title, &series.unit, &series.series, &range.fmt_from(), &range.fmt_till());
+                        0
+                    }
+                    Err(e) => die(e),
+                }
+            }
+            n => {
+                client.logout().await;
+                die(PatrolError::Config(format!(
+                    "--chart 需要唯一命中系列，当前命中 {n} 个；请用 --host 或更精确的 --key 收窄"
+                )))
+            }
+        }
+    } else {
+        client.logout().await;
+        0
+    }
 }
 
 // ---------- report ----------

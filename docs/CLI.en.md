@@ -77,9 +77,10 @@ Aggregated by key (key/name/unit/type/host-count) by default; `--detail` (with `
 ### 3.4 query — stats for arbitrary items
 
 ```bash
-zbxpatrol query --key <K> [--key <K2>…] [scope] [time] [--csv <file>] [--format json]
+zbxpatrol query --key <K> [--key <K2>…] [scope] [time] [--csv <file>] [--chart] [--format json]
 ```
 - keys support `*` wildcards (e.g. `net.if*`); repeat `--key` or comma-separate;
+- `--chart`: after the table, appends a full-size trend plot (72 buckets, Y scale + avg line) for the **single matched** series; with multiple series matched it exits with code 2 asking to narrow via `--host`/exact `--key`; mutually exclusive with `--format json/csv`;
 - outputs cur/avg/max/min + **trend sparkline** (when ≤30 items matched);
 - `--csv` saves a CSV (UTF-8 BOM, opens in Excel).
 
