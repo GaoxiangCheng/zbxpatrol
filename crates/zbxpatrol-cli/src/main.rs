@@ -165,7 +165,7 @@ enum Command {
     },
 
     /// Generate shell completion scripts (bash/zsh; --group/--host complete real names)
-    #[command(after_help = "Install:\n  bash: zbxpatrol completions bash | sudo tee /etc/bash_completion.d/zbxpatrol\n  zsh : zbxpatrol completions zsh > ~/.zfunc/_zbxpatrol (add ~/.zfunc to fpath)\n  temp: source <(zbxpatrol completions bash)")]
+    #[command(after_help = "Install:\n\nbash:\n  zbxpatrol completions bash | sudo tee /etc/bash_completion.d/zbxpatrol\n  source /etc/bash_completion.d/zbxpatrol\n\nzsh (Kali/Ubuntu default):\n  mkdir -p ~/.zfunc\n  zbxpatrol completions zsh > ~/.zfunc/_zbxpatrol\n  echo 'fpath=(~/.zfunc $fpath)' >> ~/.zshrc\n  echo 'autoload -Uz compinit && compinit' >> ~/.zshrc\n  exec zsh\n\nVerify: zbxpatrol <TAB>")]
     Completions {
         /// Shell type: bash | zsh (default: bash)
         shell: Option<String>,

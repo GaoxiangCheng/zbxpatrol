@@ -447,48 +447,72 @@ complete -F _zbxpatrol zbxpatrol
 const ZSH_COMPLETION: &str = r#"#compdef zbxpatrol
 # zbxpatrol zsh completion (dynamic group/host/item names; filters used options)
 _zbxpatrol() {
-    local -a subs opts
+    local -a subs
     subs=(check serve groups items query chart report completions)
     if (( CURRENT == 2 )); then
         _describe 'command' subs
         return
     fi
+    local sub="$words[1]"
     case $words[CURRENT-1] in
         --group)
-            local -a gs; gs=(${(f)"$($words[1] __complete groups 2>/dev/null)"})
-            _describe 'group' gs; return ;;
+            local -a gs
+            gs=(${(f)"$($words[1] __complete groups 2>/dev/null)"})
+            _describe 'group' gs
+            return ;;
         --host|--hosts)
             local g="" i
-            for ((i=2; i<CURRENT; i++)); do
-                if [[ "$words[i]" == "--group" ]]; then g="$words[i+1]"; fi
+            for (( i=2; i<CURRENT; i++ )); do
+                [[ "$words[i]" == "--group" ]] && g="$words[i+1]"
             done
             local -a hs
-            if [ -n "$g" ]; then
+            if [[ -n "$g" ]]; then
                 hs=(${(f)"$($words[1] __complete hosts --group "$g" 2>/dev/null)"})
             else
                 hs=(${(f)"$($words[1] __complete hosts 2>/dev/null)"})
             fi
-            _describe 'host' hs; return ;;
+            _describe 'host' hs
+            return ;;
         --key|--keys)
-            local h=""
-            local i
-            for ((i=2; i<CURRENT; i++)); do
-                if [[ "$words[i]" == "--host" ]]; then h="$words[i+1]]; fi
+            local h="" i
+            for (( i=2; i<CURRENT; i++ )); do
+                [[ "$words[i]" == "--host" ]] && h="$words[i+1]"
             done
-            if [ -n "$h" ]; then
-                local -a ks; ks=(${(f)"$($words[1] __complete items --host "$h" 2>/dev/null)"})
+            if [[ -n "$h" ]]; then
+                local -a ks
+                ks=(${(f)"$($words[1] __complete items --host "$h" 2>/dev/null)"})
                 _describe 'key' ks
             fi
             return ;;
-        --metric) _values metric cpu mem disk; return ;;
-        --strictness) _values strictness loose standard strict; return ;;
-        --period) _values period day week month year; return ;;
-        --format) _values format table json csv; return ;;
-        --lang) _values lang en zh; return ;;
+        --metric)
+            _values 'metric' cpu mem disk
+            return ;;
+        --strictness)
+            _values 'strictness' loose standard strict
+            return ;;
+        --period)
+            _values 'period' day week month year
+            return ;;
+        --format)
+            _values 'format' table json csv
+            return ;;
+        --lang)
+            _values 'lang' en zh
+            return ;;
     esac
-    opts=(--format --quiet --no-interactive --verbose --help --lang)
+    local -a opts
+    opts=(--format --lang --quiet --no-interactive --verbose --help)
+    case "$sub" in
+        groups) opts+=(--search --page --size) ;;
+        items)  opts+=(--host --group --search --detail) ;;
+        query)  opts+=(--key --host --group --hosts --period --last --from --to --csv) ;;
+        chart)  opts+=(--host --metric --key --period --last --from --to) ;;
+        report) opts+=(--group --host --hosts --strictness --all-items --raw --data-json --out --config --period --last --from --to) ;;
+        serve)  opts+=(--listen --token) ;;
+    esac
     _describe 'option' opts
 }
+compdef _zbxpatrol zbxpatrol
 _zbxpatrol "$@"
 "#;
 
