@@ -457,6 +457,20 @@ pub async fn run(listen: &str, token: Option<String>) -> i32 {
         .ok()
         .and_then(|s| PatrolToml::load_str(&s).ok())
         .unwrap_or_default();
+    // 安全约束：未设 token 时拒绝绑定非回环地址（所有端点免鉴权，不能暴露到外部）
+    if token.is_none() {
+        let host = listen.rsplit_once(':').map(|(h, _)| h).unwrap_or(listen);
+        let external = match host.parse::<std::net::IpAddr>() {
+            Ok(ip) => !ip.is_loopback(),
+            Err(_) => host != "localhost", // 主机名非 localhost 视为对外
+        };
+        if external {
+            eprintln!(
+                "zbxpatrol: 拒绝启动：未设置 --token 时仅允许绑定回环地址（当前 {listen}）。对外暴露必须配置 --token。"
+            );
+            return 2;
+        }
+    }
     let state = Arc::new(AppState { cfg: cfg.clone(), client, token, patrol });
     let app = Router::new()
         .route("/health", get(health))

@@ -26,12 +26,12 @@ pub fn groups(groups: &[GroupRec], fmt: Format) {
             }
         }
         _ => {
-            let mut t = mk_table();
-            t.set_header(vec!["群组ID", "群组名称"]);
+            let mut tbl = mk_table();
+            tbl.set_header(vec![t("Group ID", "群组ID"), t("Group Name", "群组名称")]);
             for g in groups {
-                t.add_row(vec![&g.groupid, &g.name]);
+                tbl.add_row(vec![&g.groupid, &g.name]);
             }
-            println!("{t}");
+            println!("{tbl}");
         }
     }
 }
@@ -55,10 +55,10 @@ pub fn hosts_list(hosts: &[zbxpatrol_core::types::HostInfo], fmt: Format) {
             }
         }
         _ => {
-            let mut t = mk_table();
-            t.set_header(vec!["主机", "可见名", "IP", "系统", "群组"]);
+            let mut tbl = mk_table();
+            tbl.set_header(vec![t("Host", "主机"), t("Visible Name", "可见名"), t("IP", "IP"), t("OS", "系统"), t("Groups", "群组")]);
             for h in hosts {
-                t.add_row(vec![
+                tbl.add_row(vec![
                     &h.host,
                     &h.name,
                     &h.ip,
@@ -66,7 +66,7 @@ pub fn hosts_list(hosts: &[zbxpatrol_core::types::HostInfo], fmt: Format) {
                     &h.groups.join("|"),
                 ]);
             }
-            println!("{t}");
+            println!("{tbl}");
         }
     }
 }
@@ -101,14 +101,14 @@ pub fn ascii_chart(title: &str, unit: &str, series: &[Option<f64>], from_label: 
     const H: usize = 14;
     let vals: Vec<f64> = series.iter().filter_map(|v| *v).collect();
     if vals.is_empty() || series.is_empty() {
-        println!("{title}：区间内无数据");
+        println!("{title}: {}", t("no data in range", "区间内无数据"));
         return;
     }
     let min = vals.iter().cloned().fold(f64::MAX, f64::min);
     let max = vals.iter().cloned().fold(f64::MIN, f64::max);
     let span = (max - min).max(1e-9);
     let avg = vals.iter().sum::<f64>() / vals.len() as f64;
-    println!("{title}  [{unit}]  最小 {min:.1} / 平均 {avg:.1} / 最大 {max:.1}");
+    println!("{title}  [{unit}]  {}: {min:.1} / {}: {avg:.1} / {}: {max:.1}", t("min","最小"), t("avg","平均"), t("max","最大"));
     let lvl = |v: f64| -> usize { (((v - min) / span * (H - 1) as f64).round() as usize).min(H - 1) };
     let avg_lvl = lvl(avg);
     for row in (0..H).rev() {
@@ -153,12 +153,12 @@ pub fn items_aggregated(rows: &[(String, String, String, String, usize)], fmt: F
             }
         }
         _ => {
-            let mut t = mk_table();
-            t.set_header(vec!["key", "名称", "单位", "类型", "覆盖主机数"]);
+            let mut tbl = mk_table();
+            tbl.set_header(vec!["key", t("Name","名称"), t("Unit","单位"), t("Type","类型"), t("Hosts Covered","覆盖主机数")]);
             for (k, n, u, v, c) in rows {
-                t.add_row(vec![k, n, u, v, &c.to_string()]);
+                tbl.add_row(vec![k, n, u, v, &c.to_string()]);
             }
-            println!("{t}");
+            println!("{tbl}");
         }
     }
 }
@@ -173,12 +173,12 @@ pub fn items_detail(rows: &[(String, String, String, String, String)], fmt: Form
             }
         }
         _ => {
-            let mut t = mk_table();
-            t.set_header(vec!["主机", "key", "名称", "当前值", "单位"]);
+            let mut tbl = mk_table();
+            tbl.set_header(vec![t("Host","主机"), "key", t("Name","名称"), t("Last Value","当前值"), t("Unit","单位")]);
             for r in rows {
-                t.add_row(vec![&r.0, &r.1, &r.2, &r.3, &r.4]);
+                tbl.add_row(vec![&r.0, &r.1, &r.2, &r.3, &r.4]);
             }
-            println!("{t}");
+            println!("{tbl}");
         }
     }
 }
@@ -187,12 +187,12 @@ pub fn query(rows: &[QueryRow], range: &TimeRange, fmt: Format) {
     match fmt {
         Format::Json => println!("{}", serde_json::to_string_pretty(rows).unwrap()),
         _ => {
-            eprintln!("查询区间：{}", range.fmt_human());
-            let mut t = mk_table();
-            t.set_header(vec!["主机", "key", "当前", "平均", "最大", "最小", "趋势", "单位", "来源"]);
+            eprintln!("{}: {}", t("Query range","查询区间"), range.fmt_human());
+            let mut tbl = mk_table();
+            tbl.set_header(vec![t("Host","主机"), "key", t("Cur","当前"), t("Avg","平均"), t("Max","最大"), t("Min","最小"), t("Trend","趋势"), t("Unit","单位"), t("Source","来源")]);
             for r in rows {
                 let spark = r.trend.as_ref().map(|s| sparkline(s)).unwrap_or_else(|| "—".into());
-                t.add_row(vec![
+                tbl.add_row(vec![
                     &r.host,
                     &r.key,
                     &fmt_opt(r.stats.cur),
@@ -204,7 +204,7 @@ pub fn query(rows: &[QueryRow], range: &TimeRange, fmt: Format) {
                     &r.stats.source,
                 ]);
             }
-            println!("{t}");
+            println!("{tbl}");
         }
     }
 }
@@ -337,9 +337,9 @@ pub fn report_console_detail(data: &ReportData) {
         row.push(comfy_table::Cell::new(&h.host.ip));
         row.push(comfy_table::Cell::new(if h.os_family.is_empty() { "—" } else { &h.os_family }));
         row.push(if h.available {
-            comfy_table::Cell::new("正常").fg(Color::Green)
+            comfy_table::Cell::new(t("Up", "正常")).fg(Color::Green)
         } else {
-            comfy_table::Cell::new("不可达").fg(Color::Red)
+            comfy_table::Cell::new(t("Down", "不可达")).fg(Color::Red)
         });
         row.push(quad(&h.metrics.cpu));
         row.push(comfy_table::Cell::new(
@@ -385,8 +385,8 @@ pub fn report_console_detail(data: &ReportData) {
 
 fn scope_label(data: &ReportData) -> String {
     match data.scope_type.as_str() {
-        "all" => "全部主机".to_string(),
-        "group" => format!("群组 {}", data.scope_names.join("、")),
+        "all" => t("All hosts", "全部主机").to_string(),
+        "group" => format!("{} {}", t("Group", "群组"), data.scope_names.join("、")),
         _ => data.scope_names.join("、"),
     }
 }
@@ -408,13 +408,10 @@ fn report_csv_content(data: &ReportData) -> String {
 
 /// 主机明细 CSV 内容（不含 BOM；serve 流式/落盘复用）
 pub fn report_csv_string(data: &ReportData) -> String {
+    // CSV 表头固定英文（供程序/Excel 消费，语言无关）
     let zh = crate::lang::is_zh();
     let mut out = String::from("\u{FEFF}");
-    if zh {
-        out.push_str("主机,IP,群组,可用性,风险分,风险等级,CPU当前%,CPU平均%,CPU最大%,CPU最小%,内存当前%,内存平均%,内存最大%,内存最小%,磁盘最满分区,磁盘当前%,磁盘平均%,磁盘最大%,磁盘最小%,主要风险点\n");
-    } else {
-        out.push_str("Host,IP,Group,Status,Score,Level,CPU cur%,CPU avg%,CPU max%,CPU min%,Mem cur%,Mem avg%,Mem max%,Mem min%,Disk (fullest),Disk cur%,Disk avg%,Disk max%,Disk min%,Risk Points\n");
-    }
+    out.push_str("Host,IP,Group,Status,Score,Level,CPU cur%,CPU avg%,CPU max%,CPU min%,Mem cur%,Mem avg%,Mem max%,Mem min%,Disk (fullest),Disk cur%,Disk avg%,Disk max%,Disk min%,Risk Points\n");
     for h in &data.hosts {
         let disk = h.metrics.disk_max.as_ref();
         let level = if zh { h.risk.level.clone() } else { bilingual::risk_level(&h.risk.level) };

@@ -153,7 +153,7 @@ fn sheet_raw_data(wb: &mut Workbook, data: &ReportData) -> Result<(), rust_xlsxw
 fn sheet_extra_items(wb: &mut Workbook, data: &ReportData) -> Result<(), rust_xlsxwriter::XlsxError> {
     let s = wb.add_worksheet();
     s.set_name(t("Custom Items", "自定义指标明细"))?;
-    let headers = ["主机", "key", "当前", "平均", "最大", "最小", "单位", "来源"];
+    let headers = [t("Host","主机"), "key", t("Cur","当前"), t("Avg","平均"), t("Max","最大"), t("Min","最小"), t("Unit","单位"), t("Source","来源")];
     for (c, h) in headers.iter().enumerate() {
         s.write_with_format(0, c as u16, *h, &header_fmt())?;
     }
@@ -239,9 +239,9 @@ fn sheet_overview(wb: &mut Workbook, data: &ReportData) -> Result<(), rust_xlsxw
     }
     // TOP 风险
     r += 1;
-    s.write_with_format(r, 0, "TOP 风险主机", &bold())?;
+    s.write_with_format(r, 0, t("TOP Risk Hosts", "TOP 风险主机"), &bold())?;
     r += 1;
-    write_row(s, r, &["排名".into(), "主机 / 风险分 / 等级".into()])?;
+    write_row(s, r, &[t("Rank","排名").to_string(), t("Host / Score / Level","主机 / 风险分 / 等级").to_string()])?;
     for (i, tr) in data.summary.top_risk.iter().enumerate() {
         if tr.score == 0 {
             break;
@@ -250,7 +250,7 @@ fn sheet_overview(wb: &mut Workbook, data: &ReportData) -> Result<(), rust_xlsxw
     }
     // 结论建议
     let mut r2 = r + 1 + data.summary.top_risk.len() as u32 + 1;
-    s.write_with_format(r2, 0, "结论与建议", &bold())?;
+    s.write_with_format(r2, 0, t("Conclusion & Advice", "结论与建议"), &bold())?;
     r2 += 1;
     let risky: Vec<&zbxpatrol_core::types::HostInspection> =
         data.hosts.iter().filter(|h| h.risk.score >= 75).collect();
@@ -380,7 +380,7 @@ fn write_pct(s: &mut rust_xlsxwriter::Worksheet, r: u32, c: u16, v: Option<f64>)
 fn sheet_disks(wb: &mut Workbook, data: &ReportData) -> Result<(), rust_xlsxwriter::XlsxError> {
     let s = wb.add_worksheet();
     s.set_name(t("Disk Partitions", "磁盘分区明细"))?;
-    let headers = ["主机", "挂载点", "总量(GB)", "已用(GB)", "当前%", "平均%", "最大%", "最小%", "inode当前%", "inode平均%", "预计满盘(天)"];
+    let headers = [t("Host","主机"), t("Mount","挂载点"), t("Total(GB)","总量(GB)"), t("Used(GB)","已用(GB)"), t("Cur%","当前%"), t("Avg%","平均%"), t("Max%","最大%"), t("Min%","最小%"), t("inode Cur%","inode当前%"), t("inode Avg%","inode平均%"), t("Days to Full","预计满盘(天)")];
     for (c, h) in headers.iter().enumerate() {
         s.write_with_format(0, c as u16, *h, &header_fmt())?;
     }
@@ -424,7 +424,7 @@ fn sheet_disks(wb: &mut Workbook, data: &ReportData) -> Result<(), rust_xlsxwrit
 fn sheet_nets(wb: &mut Workbook, data: &ReportData) -> Result<(), rust_xlsxwriter::XlsxError> {
     let s = wb.add_worksheet();
     s.set_name(t("Network & Services", "网络与服务"))?;
-    let headers = ["主机", "网卡", "入带宽(Mbps)当前/平均/最大", "出带宽(Mbps)当前/平均/最大", "带宽峰值利用率%", "错包新增(入/出)", "丢包新增(入/出)", "ICMP丢包avg%", "ICMP延迟avg(ms)"];
+    let headers = [t("Host","主机"), t("NIC","网卡"), t("In (Mbps) cur/avg/max","入带宽(Mbps)当前/平均/最大"), t("Out (Mbps) cur/avg/max","出带宽(Mbps)当前/平均/最大"), t("Peak Util%","带宽峰值利用率%"), t("Errors + (in/out)","错包新增(入/出)"), t("Drops + (in/out)","丢包新增(入/出)"), t("ICMP loss avg%","ICMP丢包avg%"), t("ICMP rtt avg(ms)","ICMP延迟avg(ms)")];
     for (c, h) in headers.iter().enumerate() {
         s.write_with_format(0, c as u16, *h, &header_fmt())?;
     }
@@ -474,7 +474,7 @@ fn tri(st: Option<&MetricStats>) -> String {
 fn sheet_stability(wb: &mut Workbook, data: &ReportData) -> Result<(), rust_xlsxwriter::XlsxError> {
     let s = wb.add_worksheet();
     s.set_name(t("Stability & Security", "稳定性与安全"))?;
-    let headers = ["主机", "区间重启次数", "时间偏移max(s)", "僵尸进程", "fd使用率%", "CPU核数", "1分钟负载avg", "证书最小天数"];
+    let headers = [t("Host","主机"), t("Reboots in range","区间重启次数"), t("Clock offset max(s)","时间偏移max(s)"), t("Zombies","僵尸进程"), t("fd util%","fd使用率%"), t("CPU cores","CPU核数"), t("Load1 avg","1分钟负载avg"), t("Cert min days","证书最小天数")];
     for (c, h) in headers.iter().enumerate() {
         s.write_with_format(0, c as u16, *h, &header_fmt())?;
     }
@@ -518,7 +518,7 @@ fn sheet_stability(wb: &mut Workbook, data: &ReportData) -> Result<(), rust_xlsx
 fn sheet_problems(wb: &mut Workbook, data: &ReportData) -> Result<(), rust_xlsxwriter::XlsxError> {
     let s = wb.add_worksheet();
     s.set_name(t("Problems & Alerts", "问题与告警"))?;
-    let headers = ["时间", "主机", "级别", "内容", "状态", "已确认"];
+    let headers = [t("Time","时间"), t("Host","主机"), t("Severity","级别"), t("Description","内容"), t("Status","状态"), t("Acknowledged","已确认")];
     for (c, h) in headers.iter().enumerate() {
         s.write_with_format(0, c as u16, *h, &header_fmt())?;
     }
@@ -585,7 +585,7 @@ fn sheet_scoring_doc(wb: &mut Workbook, data: &ReportData) -> Result<(), rust_xl
 fn sheet_all_items(wb: &mut Workbook, data: &ReportData) -> Result<(), rust_xlsxwriter::XlsxError> {
     let s = wb.add_worksheet();
     s.set_name(t("All Items", "全部指标明细"))?;
-    let headers = ["主机", "key", "当前", "平均", "最大", "最小", "单位", "来源"];
+    let headers = [t("Host","主机"), "key", t("Cur","当前"), t("Avg","平均"), t("Max","最大"), t("Min","最小"), t("Unit","单位"), t("Source","来源")];
     for (c, h) in headers.iter().enumerate() {
         s.write_with_format(0, c as u16, *h, &header_fmt())?;
     }

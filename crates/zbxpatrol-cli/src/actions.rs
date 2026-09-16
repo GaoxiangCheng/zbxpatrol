@@ -1,6 +1,7 @@
 //! 子命令实现（CLI / 交互向导 / HTTP serve 共用）。
 //! 约定：数据走 stdout，日志与进度走 stderr；错误返回退出码（2/3）。
 
+use crate::lang::t;
 use crate::render;
 use crate::Format;
 use futures::StreamExt;
@@ -55,7 +56,7 @@ pub async fn ensure_config() -> Result<()> {
     let save_path = zbxpatrol_core::env::home_config_path().ok_or_else(|| {
         PatrolError::Config("无法确定家目录（HOME 未设置），请改用环境变量".into())
     })?;
-    println!("未检测到 Zabbix 连接配置，进入首次初始化（将保存到 {}）", save_path.display());
+    println!("{}", format!("{}（{} {}）", t("No Zabbix connection config found, entering first-run setup", "未检测到 Zabbix 连接配置，进入首次初始化"), t("saved to", "将保存到"), save_path.display()));
     let url: String = Input::new()
         .with_prompt("Zabbix 地址（如 https://zabbix.example.com）")
         .validate_with(|v: &String| if v.starts_with("http") { Ok(()) } else { Err("需以 http(s):// 开头") })
@@ -110,7 +111,7 @@ pub async fn ensure_config() -> Result<()> {
         use std::os::unix::fs::PermissionsExt;
         let _ = std::fs::set_permissions(&save_path, std::fs::Permissions::from_mode(0o600));
     }
-    println!("✓ 连接验证成功（{} 个主机群组），配置已保存：{}", groups.len(), save_path.display());
+    println!("✓ {}（{} {}），{} {}", t("Connection verified", "连接验证成功"), groups.len(), t("host groups", "个主机群组"), t("config saved to", "配置已保存"), save_path.display());
     Ok(())
 }
 
@@ -148,26 +149,26 @@ pub async fn do_check(fmt: Format) -> i32 {
     let mut steps: Vec<(String, bool, String)> = Vec::new();
     let mut fail_code = 0;
     match client.api_version().await {
-        Ok(v) => steps.push((format!("连接 {}", cfg.url), true, format!("Zabbix API 版本 {v}"))),
+        Ok(v) => steps.push((format!("{} {}", t("Connect", "连接"), cfg.url), true, format!("Zabbix API 版本 {v}"))),
         Err(e) => {
-            steps.push((format!("连接 {}", cfg.url), false, e.to_string()));
+            steps.push((format!("{} {}", t("Connect", "连接"), cfg.url), false, e.to_string()));
             fail_code = 3;
         }
     }
     if fail_code == 0 {
         match client.login().await {
-            Ok(_) => steps.push(("登录（ZBX_USER/ZBX_PASSWORD）".into(), true, "认证成功".into())),
+            Ok(_) => steps.push((t("Login (ZBX_USER/ZBX_PASSWORD)", "登录（ZBX_USER/ZBX_PASSWORD）").into(), true, t("authenticated", "认证成功").into())),
             Err(e) => {
-                steps.push(("登录（ZBX_USER/ZBX_PASSWORD）".into(), false, e.to_string()));
+                steps.push((t("Login (ZBX_USER/ZBX_PASSWORD)", "登录（ZBX_USER/ZBX_PASSWORD）").into(), false, e.to_string()));
                 fail_code = 2;
             }
         }
     }
     if fail_code == 0 {
         match client.get_hosts(None, None).await {
-            Ok(hs) => steps.push(("数据读取权限".into(), true, format!("可见主机 {} 台", hs.len()))),
+            Ok(hs) => steps.push((t("Data read permission", "数据读取权限").into(), true, format!("{} {}", t("visible hosts", "可见主机"), hs.len()))),
             Err(e) => {
-                steps.push(("数据读取权限".into(), false, e.to_string()));
+                steps.push((t("Data read permission", "数据读取权限").into(), false, e.to_string()));
                 fail_code = 3;
             }
         }
@@ -188,7 +189,7 @@ pub async fn do_check(fmt: Format) -> i32 {
             eprintln!(" {mark} {s}  {d}");
         }
         if fail_code == 0 {
-            eprintln!("自检通过：环境就绪。");
+            eprintln!("{}", t("Self-check passed: environment ready.", "自检通过：环境就绪。"));
         }
     }
     fail_code
@@ -229,7 +230,7 @@ pub async fn do_groups(search: Option<String>, page: Option<usize>, size: Option
         Ok(groups) => {
             let (groups, truncated) = filter_page(groups, search.as_deref(), page, size, |g| g.name.clone());
             if truncated && fmt == Format::Table {
-                eprintln!("（已分页，更多结果请用 --page/--size）");
+                eprintln!("{}", t("(paged, more results with --page/--size)", "（已分页，更多结果请用 --page/--size）"));
             }
             render::groups(&groups, fmt);
             0
@@ -264,7 +265,7 @@ pub async fn do_hosts(
             fetch_os_family(&client, &mut hosts, cfg.concurrency).await;
             client.logout().await;
             if truncated && fmt == Format::Table {
-                eprintln!("（已分页，更多结果请用 --page/--size）");
+                eprintln!("{}", t("(paged, more results with --page/--size)", "（已分页，更多结果请用 --page/--size）"));
             }
             render::hosts_list(&hosts, fmt);
             0
@@ -742,7 +743,7 @@ pub async fn do_items(
             _ => None,
         };
         let Some(h) = h else {
-            eprintln!("--detail 需要配合 --host 使用");
+            eprintln!("{}", t("--detail requires --host", "--detail 需要配合 --host 使用"));
             return 2;
         };
         match items_detail_data(&h, &filter).await {
@@ -798,7 +799,7 @@ pub async fn do_query(
         if let Err(e) = render::query_csv_file(&rows, &path) {
             return die(PatrolError::Config(format!("CSV 写入失败：{e}")));
         }
-        eprintln!("CSV 已写入 {}", path.display());
+        eprintln!("{} {}", t("CSV written to", "CSV 已写入"), path.display());
     }
     if fmt == Format::Csv {
         render::query_csv_stdout(&rows);
@@ -868,7 +869,7 @@ pub async fn do_report(p: ReportParams) -> i32 {
         return die(e);
     }
     if !p.quiet {
-        eprintln!("巡检范围：{}   时间区间：{}", p.scope.label(), range.fmt_human());
+        eprintln!("{}: {}   {}: {}", t("Scope", "巡检范围"), p.scope.label(), t("Range", "时间区间"), range.fmt_human());
     }
     let host_count = {
         match zbxpatrol_core::discovery::resolve_hosts(&client, &p.scope).await {
