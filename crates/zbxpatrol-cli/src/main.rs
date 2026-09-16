@@ -118,6 +118,22 @@ enum Command {
         size: Option<usize>,
     },
 
+    /// List hosts (system type, IP, groups; filter and paginate)
+    Hosts {
+        /// Filter by group name
+        #[arg(long)]
+        group: Option<String>,
+        /// Filter by host/IP substring
+        #[arg(long)]
+        search: Option<String>,
+        /// Page number (1-based; requires --size)
+        #[arg(long)]
+        page: Option<usize>,
+        /// Page size (items per page)
+        #[arg(long)]
+        size: Option<usize>,
+    },
+
     /// List monitoring item keys (aggregated across hosts; --detail for per-item)
     Items {
         /// Filter by single host
@@ -197,12 +213,18 @@ enum Command {
         /// Include an "All Items" sheet with every numeric item
         #[arg(long)]
         all_items: bool,
+        /// Extra custom metrics to append (comma-separated keys, wildcards ok) → dedicated sheet
+        #[arg(long = "keys", value_delimiter = ',')]
+        keys: Vec<String>,
         /// Export raw history samples (one row per data point)
         #[arg(long)]
         raw: bool,
         /// Also save structured JSON to this file
         #[arg(long = "data-json")]
         data_json: Option<PathBuf>,
+        /// Also save a flat CSV to this file
+        #[arg(long = "csv")]
+        csv_out: Option<PathBuf>,
         /// Output directory (default: ./reports)
         #[arg(long, default_value = "./reports")]
         out: PathBuf,
@@ -218,7 +240,7 @@ enum Command {
     version,
     about = "Zabbix server inspection & reporting tool (run without subcommand for interactive wizard)",
     disable_help_subcommand = true,
-    after_help = "Commands:\n  check        Connectivity, credentials and permission self-check\n  serve        Start local HTTP API server\n  groups       List host groups (search, paginate)\n  items        List monitoring item keys (by host or group)\n  query        Get stats for any item key(s) — cur/avg/max/min + trend sparkline\n  chart        Show single-host metric trend chart (ASCII)\n  report       Generate inspection report (Excel + console + JSON/CSV)\n  completions  Generate shell completion (bash/zsh)\n\nRun without subcommand for interactive wizard.\n\nExit codes: 0 OK | 2 config/credentials | 3 network/API | 4 partial data missing\nData on stdout, logs on stderr. Non-TTY auto-disables interaction.\nEach subcommand has -h with examples."
+    after_help = "Run without subcommand for interactive wizard.\n\nExit codes: 0 OK | 2 config/credentials | 3 network/API | 4 partial data missing\nData on stdout, logs on stderr. Non-TTY auto-disables interaction.\nEach subcommand has -h with examples."
 )]
 struct Cli {
     #[command(subcommand)]
@@ -292,6 +314,9 @@ async fn run(cli: Cli) -> i32 {
         Check => actions::do_check(fmt).await,
         Serve { listen, token } => serve::run(&listen, token).await,
         Groups { search, page, size } => actions::do_groups(search, page, size, fmt).await,
+        Hosts { group, search, page, size } => {
+            actions::do_hosts(group, search, page, size, fmt).await
+        }
         
         Completions { shell } => actions::do_completions(shell.as_deref().unwrap_or("bash")),
         Complete { kind, host, group } => actions::do_complete(&kind, host.as_deref(), group.as_deref()).await,
@@ -312,16 +337,16 @@ async fn run(cli: Cli) -> i32 {
                 2
             }
         },
-        Report { scope, time, strictness, all_items, raw, data_json, out, patrol_config } => match time.spec() {
+        Report { scope, time, strictness, all_items, keys, raw, data_json, csv_out, out, patrol_config } => match time.spec() {
             Ok(spec) => {
                 actions::do_report(actions::ReportParams {
                     scope: scope.scope(),
                     time: spec,
                     strictness: strictness.clone(),
                     all_items,
-                    extra_keys: vec![],
+                    extra_keys: keys,
                     data_json,
-                    csv_out: None,
+                    csv_out,
                     out,
                     patrol_config,
                     fmt,

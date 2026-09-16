@@ -214,7 +214,8 @@ fn sheet_overview(wb: &mut Workbook, data: &ReportData) -> Result<(), rust_xlsxw
             kv("风险分布", format!("健康 {}｜低危 {}｜中危 {}｜高危 {}｜严重 {}",
                 data.summary.risk_dist.healthy, data.summary.risk_dist.low, data.summary.risk_dist.medium,
                 data.summary.risk_dist.high, data.summary.risk_dist.critical)),
-            kv("未恢复问题", format!("{} 个", data.summary.problem_open)),
+            kv("未恢复问题", format!("{} 个（区间内新增 {}，区间前遗留 {}）",
+                data.summary.problem_open, data.summary.problem_new_in_range, data.summary.problem_carried_over)),
         ]
     } else {
         vec![
@@ -228,7 +229,8 @@ fn sheet_overview(wb: &mut Workbook, data: &ReportData) -> Result<(), rust_xlsxw
             kv("Risk distribution", format!("Healthy {} | Low {} | Medium {} | High {} | Critical {}",
                 data.summary.risk_dist.healthy, data.summary.risk_dist.low, data.summary.risk_dist.medium,
                 data.summary.risk_dist.high, data.summary.risk_dist.critical)),
-            kv("Open problems", format!("{}", data.summary.problem_open)),
+            kv("Open problems", format!("{} (new in range {}, carried over {})",
+                data.summary.problem_open, data.summary.problem_new_in_range, data.summary.problem_carried_over)),
         ]
     };
     for (k, v) in rows {

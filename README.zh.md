@@ -189,7 +189,7 @@ GITEA_USER=<user> GITEA_PASS=<pass> ./deploy/package-upload.sh <version>
 ## 开发
 
 ```bash
-cargo test                 # 20 个单元测试（时间/聚合/评分/规则，离线）
+cargo test                 # 27 个单元测试（时间/聚合/评分/规则/重启检测，离线）
 cargo clippy --all-targets # 零警告
 cargo build --release
 ```

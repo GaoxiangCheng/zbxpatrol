@@ -83,15 +83,24 @@ pub fn counter_delta(samples: &[Sample]) -> Option<u64> {
     Some(total as u64)
 }
 
-/// 重启次数：boottime 序列去重计数 - 1（每次开机 boottime 唯一）
+/// 重启次数：boottime 序列容差去重计数 - 1（每次开机 boottime 唯一）
+///
+/// 部分系统 agent 上报的 boottime 会随时钟校准每日漂移数秒，精确去重会把
+/// 漂移当成多次重启；真实重启的 boottime 跳变远大于漂移，故按相邻差值容差去重。
 pub fn reboots_from_boottime(samples: &[Sample]) -> Option<i64> {
     if samples.is_empty() {
         return None;
     }
-    let mut distinct: Vec<i64> = samples.iter().map(|s| s.value as i64).collect();
-    distinct.sort_unstable();
-    distinct.dedup();
-    Some(distinct.len() as i64 - 1)
+    const DRIFT_TOLERANCE_SECS: i64 = 300;
+    let mut vals: Vec<i64> = samples.iter().map(|s| s.value as i64).collect();
+    vals.sort_unstable();
+    let mut boots = 1usize;
+    for w in vals.windows(2) {
+        if w[1] - w[0] > DRIFT_TOLERANCE_SECS {
+            boots += 1;
+        }
+    }
+    Some(boots as i64 - 1)
 }
 
 /// 重启次数（无 boottime 时）：uptime 序列向下跳变次数
@@ -234,6 +243,30 @@ mod tests {
     }
 
     #[test]
+    fn reboots_boottime_drift_is_not_reboot() {
+        // 实测场景：boottime 每天漂移约 1 秒（24h 内 933→946），不应计为重启
+        let drift: Vec<Sample> = (0..24).map(|i| s(i * 3600, 1721454933.0 + i as f64)).collect();
+        assert_eq!(reboots_from_boottime(&drift), Some(0));
+    }
+
+    #[test]
+    fn reboots_boottime_real_reboot() {
+        // 真实重启：boottime 跳变数月
+        let v = vec![s(1, 1_700_000_000.0), s(2, 1_700_000_001.0), s(3, 1_730_000_000.0)];
+        assert_eq!(reboots_from_boottime(&v), Some(1));
+        // 漂移累计但相邻差值始终小于容差 → 仍为 0（与桶起点比较会在第 24 天误报）
+        let creeping: Vec<Sample> = (0..300).map(|i| s(i * 3600, 1721454933.0 + i as f64)).collect();
+        assert_eq!(reboots_from_boottime(&creeping), Some(0));
+        assert_eq!(reboots_from_boottime(&[]), None);
+    }
+
+    #[test]
+    fn reboots_uptime_drops() {
+        let v = vec![s(1, 5000.0), s(2, 6000.0), s(3, 100.0), s(4, 200.0)];
+        assert_eq!(reboots_from_uptime(&v), Some(1));
+    }
+
+    #[test]
     fn agg_trends_weighted() {
         let rows = vec![
             TrendRow { itemid: "1".into(), clock: 1, num: 60.0, min: 1.0, avg: 10.0, max: 20.0 },
@@ -262,8 +295,11 @@ mod tests {
 
     #[test]
     fn reboot_detection() {
-        let boot = vec![s(1, 100.0), s(2, 100.0), s(3, 200.0), s(4, 200.0)];
+        // 真实重启：boottime 跳变 30 天；秒级/分钟级波动属于漂移不计
+        let boot = vec![s(1, 1.7e9), s(2, 1.7e9), s(3, 1.7e9 + 30.0 * 86400.0), s(4, 1.7e9 + 30.0 * 86400.0)];
         assert_eq!(reboots_from_boottime(&boot), Some(1));
+        let drift = vec![s(1, 1.7e9), s(2, 1.7e9 + 5.0), s(3, 1.7e9 + 20.0), s(4, 1.7e9 + 20.0)];
+        assert_eq!(reboots_from_boottime(&drift), Some(0));
         let up = vec![s(1, 50000.0), s(2, 50060.0), s(3, 10.0), s(4, 70.0)];
         assert_eq!(reboots_from_uptime(&up), Some(1));
     }

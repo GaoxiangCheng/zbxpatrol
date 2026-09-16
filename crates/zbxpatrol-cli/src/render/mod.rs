@@ -19,6 +19,12 @@ fn mk_table() -> Table {
 pub fn groups(groups: &[GroupRec], fmt: Format) {
     match fmt {
         Format::Json => println!("{}", serde_json::to_string_pretty(groups).unwrap()),
+        Format::Csv => {
+            println!("\u{FEFF}groupid,name");
+            for g in groups {
+                println!("{},{}", g.groupid, csv_escape(&g.name));
+            }
+        }
         _ => {
             let mut t = mk_table();
             t.set_header(vec!["群组ID", "群组名称"]);
@@ -30,6 +36,40 @@ pub fn groups(groups: &[GroupRec], fmt: Format) {
     }
 }
 
+
+/// 主机列表（hosts 子命令；含系统类型与群组）
+pub fn hosts_list(hosts: &[zbxpatrol_core::types::HostInfo], fmt: Format) {
+    match fmt {
+        Format::Json => println!("{}", serde_json::to_string_pretty(hosts).unwrap()),
+        Format::Csv => {
+            println!("\u{FEFF}host,name,ip,os,groups");
+            for h in hosts {
+                println!(
+                    "{},{},{},{},{}",
+                    csv_escape(&h.host),
+                    csv_escape(&h.name),
+                    h.ip,
+                    csv_escape(&h.os_family),
+                    csv_escape(&h.groups.join("|"))
+                );
+            }
+        }
+        _ => {
+            let mut t = mk_table();
+            t.set_header(vec!["主机", "可见名", "IP", "系统", "群组"]);
+            for h in hosts {
+                t.add_row(vec![
+                    &h.host,
+                    &h.name,
+                    &h.ip,
+                    &h.os_family,
+                    &h.groups.join("|"),
+                ]);
+            }
+            println!("{t}");
+        }
+    }
+}
 
 // ---------- 趋势图 ----------
 
@@ -106,6 +146,12 @@ pub fn ascii_chart(title: &str, unit: &str, series: &[Option<f64>], from_label: 
 pub fn items_aggregated(rows: &[(String, String, String, String, usize)], fmt: Format) {
     match fmt {
         Format::Json => println!("{}", serde_json::to_string_pretty(rows).unwrap()),
+        Format::Csv => {
+            println!("\u{FEFF}key,name,unit,value_type,hosts");
+            for (k, n, u, v, c) in rows {
+                println!("{},{},{},{},{}", csv_escape(k), csv_escape(n), u, v, c);
+            }
+        }
         _ => {
             let mut t = mk_table();
             t.set_header(vec!["key", "名称", "单位", "类型", "覆盖主机数"]);
@@ -120,6 +166,12 @@ pub fn items_aggregated(rows: &[(String, String, String, String, usize)], fmt: F
 pub fn items_detail(rows: &[(String, String, String, String, String)], fmt: Format) {
     match fmt {
         Format::Json => println!("{}", serde_json::to_string_pretty(rows).unwrap()),
+        Format::Csv => {
+            println!("\u{FEFF}host,key,name,lastvalue,units");
+            for r in rows {
+                println!("{},{},{},{},{}", csv_escape(&r.0), csv_escape(&r.1), csv_escape(&r.2), csv_escape(&r.3), csv_escape(&r.4));
+            }
+        }
         _ => {
             let mut t = mk_table();
             t.set_header(vec!["主机", "key", "名称", "当前值", "单位"]);
@@ -154,6 +206,26 @@ pub fn query(rows: &[QueryRow], range: &TimeRange, fmt: Format) {
             }
             println!("{t}");
         }
+    }
+}
+
+pub fn query_csv_stdout(rows: &[QueryRow]) {
+    print!("\u{FEFF}");
+    for (i, r) in rows.iter().enumerate() {
+        if i == 0 {
+            println!("host,key,cur,avg,max,min,unit,source");
+        }
+        println!(
+            "{},{},{},{},{},{},{},{}",
+            r.host,
+            csv_escape(&r.key),
+            opt_csv(r.stats.cur),
+            opt_csv(r.stats.avg),
+            opt_csv(r.stats.max),
+            opt_csv(r.stats.min),
+            csv_escape(&r.stats.unit),
+            r.stats.source
+        );
     }
 }
 
@@ -199,11 +271,11 @@ pub fn report_summary(data: &ReportData, xlsx_path: Option<&std::path::Path>, da
     if zh {
         println!("主机     : {} 台（可用 {} / 不可达 {} / 数据缺失 {}）", s.host_total, s.available, s.unavailable, s.missing_data);
         println!("风险分布 : 健康 {} | 低危 {} | 中危 {} | 高危 {} | 严重 {}", s.risk_dist.healthy, s.risk_dist.low, s.risk_dist.medium, s.risk_dist.high, s.risk_dist.critical);
-        println!("未恢复问题: {} 个", s.problem_open);
+        println!("未恢复问题: {} 个（区间内新增 {}，区间前遗留 {}）", s.problem_open, s.problem_new_in_range, s.problem_carried_over);
     } else {
         println!("Hosts     : {} (up {} / down {} / missing {})", s.host_total, s.available, s.unavailable, s.missing_data);
         println!("Risk dist : Healthy {} | Low {} | Medium {} | High {} | Critical {}", s.risk_dist.healthy, s.risk_dist.low, s.risk_dist.medium, s.risk_dist.high, s.risk_dist.critical);
-        println!("Open problems: {}", s.problem_open);
+        println!("Open problems: {} (new in range {}, carried over {})", s.problem_open, s.problem_new_in_range, s.problem_carried_over);
     }
     if !s.top_risk.is_empty() && s.top_risk[0].score > 0 {
         println!("{}:", t("Top Risk Hosts", "TOP 风险主机"));

@@ -238,6 +238,44 @@ pub async fn do_groups(search: Option<String>, page: Option<usize>, size: Option
     }
 }
 
+/// hosts 子命令：主机列表（系统类型/IP/群组；过滤与分页）
+pub async fn do_hosts(
+    group: Option<String>,
+    search: Option<String>,
+    page: Option<usize>,
+    size: Option<usize>,
+    fmt: Format,
+) -> i32 {
+    let (cfg, client) = match connect().await {
+        Ok(v) => v,
+        Err(e) => return die(e),
+    };
+    let scope = match &group {
+        Some(g) => Scope::Groups(vec![g.clone()]),
+        None => Scope::All,
+    };
+    let r = zbxpatrol_core::discovery::resolve_hosts(&client, &scope).await;
+    match r {
+        Ok(hosts) => {
+            let (mut hosts, truncated) =
+                filter_page(hosts, search.as_deref(), page, size, |h| {
+                    format!("{} {} {}", h.host, h.name, h.ip)
+                });
+            fetch_os_family(&client, &mut hosts, cfg.concurrency).await;
+            client.logout().await;
+            if truncated && fmt == Format::Table {
+                eprintln!("（已分页，更多结果请用 --page/--size）");
+            }
+            render::hosts_list(&hosts, fmt);
+            0
+        }
+        Err(e) => {
+            client.logout().await;
+            die(e)
+        }
+    }
+}
+
 /// 为主机列表补充 OS 类型（Linux/Windows…；并发拉取 system.uname/sw.os）
 pub async fn fetch_os_family(client: &Arc<ZabbixClient>, hosts: &mut [HostInfo], concurrency: usize) {
     let sem = Arc::new(tokio::sync::Semaphore::new(concurrency.max(1)));
@@ -453,7 +491,7 @@ _zbxpatrol() {
         _describe 'command' subs
         return
     fi
-    local sub="$words[1]"
+    local sub="$words[2]"
     case $words[CURRENT-1] in
         --group)
             local -a gs
@@ -518,10 +556,19 @@ _zbxpatrol "$@"
 
 pub fn do_completions(shell: &str) -> i32 {
     match shell {
-        "zsh" => println!("{ZSH_COMPLETION}"),
-        _ => println!("{BASH_COMPLETION}"),
+        "zsh" => {
+            println!("{ZSH_COMPLETION}");
+            0
+        }
+        "bash" => {
+            println!("{BASH_COMPLETION}");
+            0
+        }
+        other => {
+            eprintln!("zbxpatrol: 不支持的 shell {other:?}（仅支持 bash | zsh）");
+            2
+        }
     }
-    0
 }
 
 // ---------- 趋势图 ----------
@@ -539,6 +586,11 @@ pub async fn do_chart(host: String, metric: String, key: Option<String>, spec: T
     client.logout().await;
     match r {
         Ok(s) => {
+            if fmt == Format::Csv {
+                return die(PatrolError::Config(
+                    "chart 不支持 csv 输出（支持 table | json）".into(),
+                ));
+            }
             if fmt == Format::Json {
                 println!(
                     "{}",
@@ -631,8 +683,16 @@ pub async fn items_aggregated_data(scope: &Scope, filter: &str) -> Result<Vec<It
     Ok(rows)
 }
 
-/// 单主机逐条明细（含当前值）
+/// 单主机逐条明细（含当前值）；numeric_only=true 仅返回数值型（出图/巡检用）
 pub async fn items_detail_data(host: &str, filter: &str) -> Result<Vec<ItemDetailRow>> {
+    items_detail_data_opt(host, filter, false).await
+}
+
+pub async fn items_detail_data_opt(
+    host: &str,
+    filter: &str,
+    numeric_only: bool,
+) -> Result<Vec<ItemDetailRow>> {
     let (_cfg, client) = connect().await?;
     let hosts = client.get_hosts(None, Some(&[host.to_string()])).await?;
     let Some(h) = hosts.first() else {
@@ -644,6 +704,7 @@ pub async fn items_detail_data(host: &str, filter: &str) -> Result<Vec<ItemDetai
     let fl = filter.to_lowercase();
     Ok(items
         .into_iter()
+        .filter(|it| !numeric_only || it.numeric())
         .filter(|it| {
             fl.is_empty()
                 || it.key.to_lowercase().contains(&fl)
@@ -736,6 +797,10 @@ pub async fn do_query(
             return die(PatrolError::Config(format!("CSV 写入失败：{e}")));
         }
         eprintln!("CSV 已写入 {}", path.display());
+    }
+    if fmt == Format::Csv {
+        render::query_csv_stdout(&rows);
+        return 0;
     }
     render::query(&rows, &range, fmt);
     0
