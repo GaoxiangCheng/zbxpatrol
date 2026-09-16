@@ -69,9 +69,12 @@ zbxpatrol serve --listen 0.0.0.0:8787 --token <TOKEN>
 | 401 | 401 | Missing/wrong token |
 | 502 | 3 | Network or Zabbix API error (incl. failed re-login) |
 | 500 | 3 | xlsx generation failure |
+| 404 | 0 | unknown endpoint |
 
 <a id="time"></a>
 ### 2.4 Time parameter (pick one)
+
+Both a nested `time` object (recommended, below) and flat fields `period`/`last`/`from`/`to` are accepted; mixing them returns 400.
 
 ```json
 {"period": "day|week|month|year"}       // 24h / 7d / 30d / 365d

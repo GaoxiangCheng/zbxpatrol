@@ -124,7 +124,7 @@ Excel（`巡检报告_<起>-<止>_<范围>.xlsx`，条件格式绿/黄/红）：
 
 ## 指标体系（环境自适应）
 
-按 key 正则自动发现，**存在才启用、不存在不占位**：CPU（利用/负载/核数）、内存、swap、磁盘（空间+inode，兼容 `vfs.fs.size` 老格式与 `vfs.fs.dependent.size` 新格式、Windows 分区）、网卡流量/错包/丢包、运行时长/重启检测（boottime 去重）、时间同步偏移、僵尸进程、fd、端口/服务探测、ICMP、证书、Docker/数据库/IPMI（如配置）。>1 天区间自动用小时级 trend（加权平均），≤1 天用 history；累计计数器自动差分折算速率。自定义指标在 `patrol.toml` 加一条正则即可接入。
+按 key 正则自动发现，**存在才启用、不存在不占位**：CPU（利用/负载/核数）、内存、swap、磁盘（空间+inode，兼容 `vfs.fs.size` 老格式与 `vfs.fs.dependent.size` 新格式、Windows 分区）、网卡流量/错包/丢包、运行时长/重启检测（boottime 容差去重 + uptime 交叉验证）、时间同步偏移、僵尸进程、fd、端口/服务探测、ICMP、证书、Docker/数据库/IPMI（如配置）。>1 天区间自动用小时级 trend（加权平均），≤1 天用 history；累计计数器自动差分折算速率。自定义指标在 `patrol.toml` 加一条正则即可接入。
 
 ## HTTP API（第三方调用）
 

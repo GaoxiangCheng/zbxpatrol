@@ -122,7 +122,7 @@ Unreachable/failed services are critical outright; event rules (reboots, OOM, zo
 
 ## Metrics (environment-adaptive)
 
-Auto-discovered by key regex — **present → enabled, absent → no placeholder**: CPU (util/load/cores), memory, swap, disks (space+inode, legacy & modern templates, Windows partitions), NIC traffic/errors/drops, uptime/reboot detection (boottime dedup), clock offset, zombies, fd, port/service probes, ICMP, certificates, Docker/DB/IPMI when configured. Ranges >1 day use hourly trends (weighted average); ≤1 day uses history; cumulative counters are auto-differenced into rates. New metrics plug in via one regex in `patrol.toml`.
+Auto-discovered by key regex — **present → enabled, absent → no placeholder**: CPU (util/load/cores), memory, swap, disks (space+inode, legacy & modern templates, Windows partitions), NIC traffic/errors/drops, uptime/reboot detection (boottime tolerance dedup + uptime cross-check), clock offset, zombies, fd, port/service probes, ICMP, certificates, Docker/DB/IPMI when configured. Ranges >1 day use hourly trends (weighted average); ≤1 day uses history; cumulative counters are auto-differenced into rates. New metrics plug in via one regex in `patrol.toml`.
 
 ## HTTP API (for programs)
 

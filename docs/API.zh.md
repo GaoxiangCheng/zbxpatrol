@@ -74,10 +74,13 @@ zbxpatrol serve --listen 0.0.0.0:8787 --token <你的TOKEN>
 | 400 | 2 | 请求参数/配置/凭据错误（如未知群组、strictness 非法） |
 | 401 | 401 | token 缺失或错误 |
 | 502 | 3 | 网络或 Zabbix API 错误（含认证失效重登仍失败） |
+| 404 | 0 | 未知端点 |
 | 500 | 3 | 报表 xlsx 生成失败 |
 
 <a id="time"></a>
-### 2.4 时间参数（time 对象，三选一）
+### 2.4 时间参数（三选一）
+
+支持嵌套 `time` 对象（推荐，见下）或平铺字段 `period`/`last`/`from`/`to`；两者不可混用（混用返回 400）。
 
 ```json
 {"period": "day|week|month|year"}      // 24h / 7d / 30d / 365d
