@@ -170,15 +170,17 @@ cargo install cross && cross build --release --target x86_64-unknown-linux-musl
 
 > **内网 DNS 兼容（已内置解决）**：程序内置 hickory 纯 Rust DNS 解析器（查询行为与 glibc/curl 一致），静态二进制在各类内网 DNS 环境下均可正常解析，**无需任何额外配置**。此特性在 Rocky Linux 9.8 + 内网 DNS 环境实测通过（此前 musl 自带解析器与部分内网 DNS 不兼容的问题已根治）。若极端环境仍报 `Name does not resolve`，兜底方案：`echo "<Zabbix服务器IP> <你的Zabbix域名>" >> /etc/hosts`（示例，替换为实际值）。
 
-## 从 GitHub Releases 安装（v1.2.0+）
+## 从 GitHub Releases 安装
 
-各平台预编译静态二进制附带在 [GitHub Release](https://github.com/GaoxiangCheng/zbxpatrol/releases)（Linux x86_64 / Linux aarch64 / macOS Apple 芯片，无运行时依赖，SHA-256 见 `checksums-sha256.txt`）：
+各平台预编译静态二进制附带在每个 [GitHub Release](https://github.com/GaoxiangCheng/zbxpatrol/releases)（Linux x86_64 / Linux aarch64 / macOS Apple 芯片，无运行时依赖，SHA-256 见 `checksums-sha256.txt`）。`releases/latest/download` 直链永远指向最新版本：
 
 ```bash
-curl -LO https://github.com/GaoxiangCheng/zbxpatrol/releases/download/v1.2.0/zbxpatrol-1.2.0-linux-x86_64
-chmod +x zbxpatrol && ./zbxpatrol check
+curl -LO https://github.com/GaoxiangCheng/zbxpatrol/releases/latest/download/zbxpatrol-linux-x86_64
+chmod +x zbxpatrol && ./zbxpatrol check          # ./zbxpatrol --version 查看发布版本
 
-# macOS 提示：未公证构建，首次运行可能需要：xattr -d com.apple.quarantine ./zbxpatrol
+# macOS Apple Silicon（M 系列）+ 未签名提示：
+curl -LO https://github.com/GaoxiangCheng/zbxpatrol/releases/latest/download/zbxpatrol-macos-arm64
+chmod +x zbxpatrol-macos-arm64 && xattr -d com.apple.quarantine zbxpatrol-macos-arm64 2>/dev/null; ./zbxpatrol-macos-arm64 --help
 
 ## 开发
 

@@ -168,15 +168,17 @@ cargo install cross && cross build --release --target x86_64-unknown-linux-musl
 
 > **Internal-DNS compatibility (built-in)**: ships the hickory pure-Rust resolver (glibc-compatible behavior), so static binaries resolve fine in internal-DNS environments with zero configuration (verified on Rocky Linux 9.8). Extreme fallback: append `"<zabbix-ip> <your-zabbix-domain>"` to `/etc/hosts`.
 
-## Install from GitHub Releases (v1.2.0+)
+## Install from GitHub Releases
 
-Prebuilt static binaries are attached to each [GitHub Release](https://github.com/GaoxiangCheng/zbxpatrol/releases) (Linux x86_64 / Linux aarch64 / macOS Apple Silicon — no runtime dependencies, SHA-256 in `checksums-sha256.txt`):
+Prebuilt static binaries are attached to every [GitHub Release](https://github.com/GaoxiangCheng/zbxpatrol/releases) (Linux x86_64 / Linux aarch64 / macOS Apple Silicon — no runtime dependencies, SHA-256 in `checksums-sha256.txt`). The `releases/latest/download` URL always serves the newest version:
 
 ```bash
-curl -LO https://github.com/GaoxiangCheng/zbxpatrol/releases/download/v1.2.0/zbxpatrol-1.2.0-linux-x86_64
-chmod +x zbxpatrol && ./zbxpatrol check
+curl -LO https://github.com/GaoxiangCheng/zbxpatrol/releases/latest/download/zbxpatrol-linux-x86_64
+chmod +x zbxpatrol && ./zbxpatrol check          # ./zbxpatrol --version shows the release
 
-# macOS note: unsigned build — first run may need: xattr -d com.apple.quarantine ./zbxpatrol
+# macOS Apple Silicon (M-series) + unsigned-build note:
+curl -LO https://github.com/GaoxiangCheng/zbxpatrol/releases/latest/download/zbxpatrol-macos-arm64
+chmod +x zbxpatrol-macos-arm64 && xattr -d com.apple.quarantine zbxpatrol-macos-arm64 2>/dev/null; ./zbxpatrol-macos-arm64 --help
 ```
 
 ## Development

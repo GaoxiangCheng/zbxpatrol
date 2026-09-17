@@ -9,7 +9,7 @@
 | 项 | 值 |
 |---|---|
 | 名称 | zbxpatrol |
-| 版本 | 1.2.0 |
+| 版本 | （随 Release，见 Tags，文档不固定版本号） |
 | 语言 | Rust (edition 2021) |
 | 代码仓库 | https://github.com/GaoxiangCheng/zbxpatrol (GitHub)；内网 Gitea 作镜像 |
 | 运行环境 | Linux x86_64/aarch64 (musl 静态)、macOS arm64 |
