@@ -401,5 +401,8 @@ components:
             risk_dist: { $ref: "#/components/schemas/RiskDist" }
             top_risk: { type: array, items: { $ref: "#/components/schemas/TopRisk" } }
             problem_open: { type: integer }
+            problem_new_in_range: { type: integer }
+            problem_carried_over: { type: integer }
+            host_disabled: { type: integer }
         hosts: { type: array, items: { $ref: "#/components/schemas/HostInspection" } }
         problems: { type: array, items: { $ref: "#/components/schemas/Problem" } }

@@ -209,16 +209,18 @@ curl -s -X POST "http://127.0.0.1:8787/report?format=xlsx&save=1" \
   "scope_names": ["<群组名>"],
   "strictness": "标准（基准 80%）",
   "summary": {
-    "host_total": 5, "available": 5, "unavailable": 0, "missing_data": 0,
+    "host_total": 5, "available": 5, "unavailable": 0, "missing_data": 0, "host_disabled": 0,
     "risk_dist": { "healthy": 3, "low": 0, "medium": 1, "high": 1, "critical": 0 },
     "top_risk": [ { "host": "<主机名>", "score": 75, "level": "高危" } ],
-    "problem_open": 0
+    "problem_open": 0,
+    "problem_new_in_range": 0, "problem_carried_over": 0, "host_disabled": 0
   },
   "hosts": [                                   // HostInspection[]
     {
-      "host": { "hostid":"…", "host":"<主机名>", "name":"<可见名>", "ip":"<IP>", "groups":[…], "os_family":"Linux" },
+      "host": { "hostid":"…", "host":"<主机名>", "name":"<可见名>", "ip":"<IP>", "groups":[…], "os_family":"Linux", "status":"0" },
       "os": "<uname 原文>", "os_family": "Linux|Windows|…",
       "available": true,
+      "host_disabled": false,                   // true = Zabbix 中已停用（不参与评分）
       "metrics": {
         "cpu":  { "cur":…, "avg":…, "max":…, "min":…, "unit":"%", "count":n, "source":"history|trend", "missing":false },
         "mem":  { …同上… },
@@ -236,7 +238,8 @@ curl -s -X POST "http://127.0.0.1:8787/report?format=xlsx&save=1" \
                      "icmp_loss":{…}|null, "icmp_latency":{…}|null, "cert_min_days":{…}|null, "oom_events":null },
       "risk": { "score": 75, "level": "高危", "points": ["[+30] 内存 使用率 71.4%，达到中危阈值 70%"] },
       "problems": [ { "eventid":"…", "name":"…", "severity":4, "severity_label":"高危",
-                      "clock":…, "recovered":false, "acknowledged":false, "hosts":["<主机名>"] } ],
+                      "clock":…, "recovered":false, "acknowledged":false, "hosts":["<主机名>"],
+                      "disabled":false } ],                // disabled=true = 触发器/主机已停用（不参与评分）
       "spark":  { "cpu":[…48桶], "mem":[…], "disk":[…], "disk_mount":"/data" },   // 趋势火花线序列
       "extra":  { "<附加key>": {四值统计} },                                      // 请求 keys 命中项
       "all_items": { "<key>": {四值统计} },                                      // all_items=true 时

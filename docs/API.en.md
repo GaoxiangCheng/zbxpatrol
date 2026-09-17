@@ -203,16 +203,17 @@ curl -s -X POST "http://127.0.0.1:8787/report?format=xlsx&save=1" \
   "scope_names": ["<group>"],
   "strictness": "标准（基准 80%）",
   "summary": {
-    "host_total": 5, "available": 5, "unavailable": 0, "missing_data": 0,
+    "host_total": 5, "available": 5, "unavailable": 0, "missing_data": 0, "host_disabled": 0,
     "risk_dist": { "healthy": 3, "low": 0, "medium": 1, "high": 1, "critical": 0 },
     "top_risk": [ { "host": "<host>", "score": 75, "level": "高危" } ],
     "problem_open": 0
   },
   "hosts": [   // HostInspection[]
     {
-      "host": { "hostid":"…", "host":"<host>", "name":"<name>", "ip":"<IP>", "groups":[…], "os_family":"Linux" },
+      "host": { "hostid":"…", "host":"<host>", "name":"<name>", "ip":"<IP>", "groups":[…], "os_family":"Linux", "status":"0" },
       "os": "<raw uname>", "os_family": "Linux|Windows|…",
       "available": true,
+      "host_disabled": false,                   // true = disabled in Zabbix (excluded from scoring)
       "metrics": {
         "cpu":  { "cur":…, "avg":…, "max":…, "min":…, "unit":"%", "count":n, "source":"history|trend", "missing":false },
         "mem":  { … },
@@ -230,7 +231,7 @@ curl -s -X POST "http://127.0.0.1:8787/report?format=xlsx&save=1" \
                      "icmp_loss":{…}|null, "icmp_latency":{…}|null, "cert_min_days":{…}|null, "oom_events":null },
       "risk": { "score": 75, "level": "高危", "points": ["[+30] …"] },
       "problems": [ { "eventid":"…", "name":"…", "severity":4, "severity_label":"高危",
-                      "clock":…, "recovered":false, "acknowledged":false, "hosts":["<host>"] } ],
+                      "clock":…, "recovered":false, "acknowledged":false, "hosts":["<host>"], "disabled":false } ],
       "spark":  { "cpu":[…48 buckets], "mem":[…], "disk":[…], "disk_mount":"/data" },
       "extra":  { "<extra key>": {quad} },
       "all_items": { "<key>": {quad} },

@@ -101,11 +101,11 @@ Non-interactive runs missing config exit with code 2 immediately — they never 
 Excel (`巡检报告_<from>-<to>_<scope>.xlsx`, conditional green/yellow/red):
 
 1. **Overview**: range, availability, risk distribution, TOP10, conclusions
-2. **Host details**: CPU/memory/disk(fullest)/swap/inode each **cur/avg/max/min** + load + risk score/level/findings
+2. **Host details**: status (up / unreachable / **disabled** — disabled hosts excluded from scoring) + CPU/mem/disk(fullest)/swap/inode **cur/avg/max/min** + load + risk score/level/points
 3. **Partitions**: capacity, space%, inode%, days-to-full (ranges >7d)
 4. **Network & services**: NIC bandwidth (Mbps), utilization, errors/drops, port/service probes
 5. **Stability & security**: reboots, clock offset, zombies, fd usage, certificate days
-6. **Problems & alerts** in range
+6. **Problems & alerts** in range (problems from disabled triggers/hosts are marked **disabled**, excluded from open counters and scoring)
 7. **Scoring notes**: thresholds & weights
 8. **All items** (`--all-items`)
 
@@ -118,7 +118,7 @@ Excel (`巡检报告_<from>-<to>_<scope>.xlsx`, conditional green/yellow/red):
 | Disk/inode | 98/95/90/85 | 90/85/80/75 | 80/75/70/65 |
 | CPU peak / swap / bandwidth,fd | 99 / 60 / 90 | 95 / 50 / 80 | 85 / 40 / 70 |
 
-Unreachable/failed services are critical outright; event rules (reboots, OOM, zombies, clock offset, certificates, high alerts) do not scale with the baseline. Levels: 0–39 healthy / 40–59 low / 60–74 medium / 75–89 high / 90–100 critical. The active mode and thresholds are recorded in the report and JSON (`strictness`). Custom `[[scoring]]` rules in `patrol.toml` replace the built-ins entirely (examples in `patrol.example.toml`; **full custom-scoring guide: [docs/SCORING.en.md](docs/SCORING.en.md)**).
+Unreachable/failed services are critical outright; event rules (reboots, OOM, zombies, clock offset, certificates, high alerts) do not scale with the baseline. Levels: 0–39 healthy / 40–59 low / 60–74 medium / 75–89 high / 90–100 critical. The active mode and thresholds are recorded in the report and JSON (`strictness`). Custom `[[scoring]]` rules in `patrol.toml` replace the built-ins entirely (examples in `patrol.example.toml`; **full custom-scoring guide: [docs/SCORING.en.md](docs/SCORING.en.md)**). Disabled hosts, items and triggers are excluded from scoring; disabled hosts are flagged as such and counted separately.
 
 ## Metrics (environment-adaptive)
 

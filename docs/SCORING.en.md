@@ -88,6 +88,8 @@ kind = "util"
 <a id="scoring"></a>
 ## 4. Custom Scoring Rules
 
+> **Note**: disabled hosts, items and triggers are excluded from scoring — disabled hosts are flagged as such (score 0), disabled items are not collected, problems from disabled triggers are flagged and excluded from counters. Custom scoring rules only apply to the data that participates.
+
 Fully replaces built-in scoring. Each rule is evaluated independently.
 
 | Field | Required | Description |
