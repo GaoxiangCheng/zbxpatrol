@@ -107,8 +107,23 @@ pub async fn run_inspection(
     for (_, _, r) in results {
         match r {
             Ok(mut hi) => {
-                hi.problems = by_host.remove(&hi.host.host).unwrap_or_default();
-                hi.risk = scorer.score(&hi);
+                // 停用触发器/主机的问题只展示，不参与评分
+                hi.problems = by_host
+                    .remove(&hi.host.host)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter(|p| !p.disabled)
+                    .collect();
+                if hi.host_disabled {
+                    // 停用主机不参与评分
+                    hi.risk = crate::types::RiskResult {
+                        score: 0,
+                        level: "停用".into(),
+                        points: vec![],
+                    };
+                } else {
+                    hi.risk = scorer.score(&hi);
+                }
                 if hi.missing_data {
                     missing = true;
                 }
@@ -144,6 +159,7 @@ fn build_report(
             summary.missing_data += 1;
         }
         match h.risk.level.as_str() {
+            "停用" => summary.host_disabled += 1,
             "健康" => summary.risk_dist.healthy += 1,
             "低危" => summary.risk_dist.low += 1,
             "中危" => summary.risk_dist.medium += 1,
@@ -151,9 +167,12 @@ fn build_report(
             _ => summary.risk_dist.critical += 1,
         }
     }
-    summary.problem_open = problems.iter().filter(|p| !p.recovered).count() as i64;
-    summary.problem_new_in_range =
-        problems.iter().filter(|p| !p.recovered && p.clock >= range.from).count() as i64;
+    summary.problem_open =
+        problems.iter().filter(|p| !p.recovered && !p.disabled).count() as i64;
+    summary.problem_new_in_range = problems
+        .iter()
+        .filter(|p| !p.recovered && !p.disabled && p.clock >= range.from)
+        .count() as i64;
     summary.problem_carried_over = summary.problem_open - summary.problem_new_in_range;
     let mut top: Vec<&HostInspection> = hosts.iter().collect();
     top.sort_by_key(|h| std::cmp::Reverse(h.risk.score));
@@ -401,7 +420,9 @@ async fn inspect_host(
     raw: bool,
 ) -> Result<HostInspection> {
     let items = client.get_items(&host.hostid).await?;
-    let c = classify_host(&items, rules);
+    // 停用监控项不参与指标采集与评分（全量明细 sheet 仍保留展示）
+    let enabled_items: Vec<_> = items.iter().filter(|i| i.status != "1").cloned().collect();
+    let c = classify_host(&enabled_items, rules);
 
     // ---- 主指标（preferred 来源聚合）----
     let mut main: Vec<&ItemRec> = Vec::new();
@@ -783,6 +804,7 @@ async fn inspect_host(
         host: host.clone(),
         os,
         os_family,
+        host_disabled: host.status == "1",
         available,
         metrics: MainMetrics { cpu, mem, swap, disk_max, inode_max, uptime_days },
         disks,

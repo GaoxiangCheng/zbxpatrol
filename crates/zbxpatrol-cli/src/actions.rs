@@ -313,7 +313,7 @@ fn parse_items(v: &serde_json::Value, hostid: &str) -> Vec<ItemRec> {
     v.as_array()
         .map(|arr| {
             arr.iter()
-                .map(|it| ItemRec {
+                .map(|it| zbxpatrol_core::types::ItemRec {
                     itemid: it["itemid"].as_str().unwrap_or_default().into(),
                     hostid: hostid.into(),
                     key: it["key_"].as_str().unwrap_or_default().into(),
@@ -322,6 +322,7 @@ fn parse_items(v: &serde_json::Value, hostid: &str) -> Vec<ItemRec> {
                     units: it["units"].as_str().unwrap_or_default().into(),
                     lastvalue: it["lastvalue"].as_str().map(|s| s.to_string()),
                     lastclock: it["lastclock"].as_str().and_then(|s| s.parse().ok()),
+                    status: it["status"].as_str().unwrap_or_default().into(),
                 })
                 .collect()
         })

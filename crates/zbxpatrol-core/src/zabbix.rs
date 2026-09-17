@@ -265,6 +265,7 @@ impl ZabbixClient {
                 hostid: h["hostid"].as_str().unwrap_or_default().into(),
                 host: h["host"].as_str().unwrap_or_default().into(),
                 name: h["name"].as_str().unwrap_or_default().into(),
+                status: h["status"].as_str().unwrap_or_default().into(),
                 ip,
                 os_family: String::new(),
                 groups: h["groups"]
@@ -317,7 +318,7 @@ impl ZabbixClient {
     pub async fn get_items(&self, hostid: &str) -> Result<Vec<ItemRec>> {
         let params = json!({
             "hostids": [hostid],
-            "output": ["itemid","key_","name","value_type","units","lastvalue","lastclock","state"],
+            "output": ["itemid","key_","name","value_type","units","lastvalue","lastclock","state","status"],
             "monitored": true,
             "sortfield": "key_",
             "limit": 5000,
@@ -332,6 +333,7 @@ impl ZabbixClient {
             units: it["units"].as_str().unwrap_or_default().into(),
             lastvalue: it["lastvalue"].as_str().map(|s| s.to_string()),
             lastclock: it["lastclock"].as_str().and_then(|s| s.parse().ok()),
+            status: it["status"].as_str().unwrap_or_default().into(),
         }))
     }
 
@@ -454,6 +456,7 @@ impl ZabbixClient {
                     severity: sev,
                     severity_label: crate::problems::severity_label(sev).to_string(),
                     clock: p["clock"].as_str().and_then(|s| s.parse().ok()).unwrap_or(0),
+                    disabled: false,
                     recovered: p["r_eventid"].as_str().map(|s| s != "0").unwrap_or(false),
                     acknowledged: p["acknowledged"].as_str().map(|s| s == "1").unwrap_or(false),
                     hosts: Vec::new(),
@@ -475,30 +478,46 @@ impl ZabbixClient {
                     "trigger.get",
                     json!({
                         "triggerids": trig_ids,
-                        "output": ["triggerid"],
-                        "selectHosts": ["host"],
+                        "output": ["triggerid", "status"],
+                        "selectHosts": ["host", "status"],
                         "limit": 2000,
                     }),
                 )
                 .await?;
-            let mut tmap: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+            // triggerid → (触发器启用?, [(主机名, 主机监控中?)])
+            let mut tmap: std::collections::HashMap<String, (bool, Vec<(String, bool)>)> =
+                std::collections::HashMap::new();
             for t in parse_array(&tv, |t| t.clone()) {
-                let hosts: Vec<String> = t["hosts"]
+                let enabled = t["status"].as_str() != Some("1");
+                let hosts: Vec<(String, bool)> = t["hosts"]
                     .as_array()
                     .map(|hs| {
                         hs.iter()
-                            .filter_map(|h| h["host"].as_str().map(|s| s.to_string()))
+                            .filter_map(|h| {
+                                h["host"].as_str().map(|s| {
+                                    (s.to_string(), h["status"].as_str() != Some("1"))
+                                })
+                            })
                             .collect()
                     })
                     .unwrap_or_default();
                 if let Some(tid) = t["triggerid"].as_str() {
-                    tmap.insert(tid.to_string(), hosts);
+                    tmap.insert(tid.to_string(), (enabled, hosts));
                 }
             }
             for (p, tid) in &raw {
-                if let Some(hs) = tmap.get(tid) {
-                    if let Some(target) = problems.iter_mut().find(|x| x.eventid == p.eventid) {
-                        target.hosts = hs.clone();
+                let (enabled, hosts, exists) = match tmap.get(tid) {
+                    Some((en, hs)) => (*en, hs.clone(), true),
+                    None => (false, Vec::new(), false),
+                };
+                if let Some(target) = problems.iter_mut().find(|x| x.eventid == p.eventid) {
+                    if exists && enabled && hosts.iter().any(|(_, up)| *up) {
+                        // 触发器启用且至少一台主机在监控 → 正常展示
+                        target.hosts = hosts.iter().map(|(n, _)| n.clone()).collect();
+                    } else {
+                        // 触发器已停用 / 主机已停用 / 触发器已删除 → 标记「停用」，不参与评分
+                        target.disabled = true;
+                        target.hosts = hosts.iter().map(|(n, _)| n.clone()).collect();
                     }
                 }
             }

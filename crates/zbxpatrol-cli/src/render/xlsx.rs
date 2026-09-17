@@ -216,6 +216,7 @@ fn sheet_overview(wb: &mut Workbook, data: &ReportData) -> Result<(), rust_xlsxw
                 data.summary.risk_dist.high, data.summary.risk_dist.critical)),
             kv("未恢复问题", format!("{} 个（区间内新增 {}，区间前遗留 {}）",
                 data.summary.problem_open, data.summary.problem_new_in_range, data.summary.problem_carried_over)),
+            kv("停用主机", format!("{}", data.summary.host_disabled)),
         ]
     } else {
         vec![
@@ -231,6 +232,7 @@ fn sheet_overview(wb: &mut Workbook, data: &ReportData) -> Result<(), rust_xlsxw
                 data.summary.risk_dist.high, data.summary.risk_dist.critical)),
             kv("Open problems", format!("{} (new in range {}, carried over {})",
                 data.summary.problem_open, data.summary.problem_new_in_range, data.summary.problem_carried_over)),
+            kv("Disabled hosts", format!("{}", data.summary.host_disabled)),
         ]
     };
     for (k, v) in rows {
@@ -308,7 +310,7 @@ fn sheet_hosts(wb: &mut Workbook, data: &ReportData) -> Result<(), rust_xlsxwrit
         s.write(r, c, h.host.ip.as_str())?; c += 1;
         s.write(r, c, h.host.groups.join(",").as_str())?; c += 1;
         s.write(r, c, h.os.as_str())?; c += 1;
-        let avail = if h.available { "正常" } else { "不可达" };
+        let avail = if h.host_disabled { "停用".to_string() } else if h.available { "正常".to_string() } else { "不可达".to_string() };
         s.write_with_format(r, c, avail, &if h.available { pct_fmt(None) } else { pct_fmt(Some(99.0)) })?; c += 1;
         s.write_with_format(r, c, h.metrics.uptime_days.unwrap_or(-1.0), &num_fmt())?; c += 1;
         // CPU / 内存
@@ -531,7 +533,7 @@ fn sheet_problems(wb: &mut Workbook, data: &ReportData) -> Result<(), rust_xlsxw
         let sev = Format::new().set_background_color(Color::RGB(if p.severity >= 4 { RED } else if p.severity >= 3 { YELLOW } else { 0xFFFFFF }));
         s.write_with_format(r, 2, p.severity_label.as_str(), &sev)?;
         s.write(r, 3, p.name.as_str())?;
-        s.write(r, 4, if p.recovered { "已恢复" } else { "未恢复" })?;
+        s.write(r, 4, if p.disabled { "停用" } else if p.recovered { "已恢复" } else { "未恢复" })?;
         s.write(r, 5, if p.acknowledged { "是" } else { "否" })?;
     }
     Ok(())

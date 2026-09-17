@@ -23,6 +23,9 @@ pub struct HostInfo {
     /// Linux / Windows / FreeBSD / macOS / AIX / 其他 / 未知（hosts 列表时填充）
     #[serde(default)]
     pub os_family: String,
+    /// "0" = 监控中，"1" = 已停用
+    #[serde(default)]
+    pub status: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,6 +39,9 @@ pub struct ItemRec {
     pub units: String,
     pub lastvalue: Option<String>,
     pub lastclock: Option<i64>,
+    /// "0" = 启用，"1" = 已停用
+    #[serde(default)]
+    pub status: String,
 }
 
 impl ItemRec {
@@ -179,6 +185,9 @@ pub struct ProblemRec {
     pub recovered: bool,
     pub acknowledged: bool,
     pub hosts: Vec<String>,
+    /// 触发器已停用或所属主机未启用（仅展示与统计，不参与评分）
+    #[serde(default)]
+    pub disabled: bool,
 }
 
 // ---------- 评分 ----------
@@ -230,6 +239,9 @@ pub struct HostInspection {
     /// Linux / Windows / …（由 uname/sw.os 推导）
     pub os_family: String,
     pub available: bool,
+    /// Zabbix 中该主机已停用（不参与评分，报表标记「停用」）
+    #[serde(default)]
+    pub host_disabled: bool,
     pub metrics: MainMetrics,
     pub disks: Vec<DiskStat>,
     pub nets: Vec<NetIfStat>,
@@ -286,6 +298,9 @@ pub struct Summary {
     /// 其中开始于区间之前的遗留告警数
     #[serde(default)]
     pub problem_carried_over: i64,
+    /// 已停用主机数（不参与评分）
+    #[serde(default)]
+    pub host_disabled: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -275,11 +275,11 @@ pub fn report_summary(data: &ReportData, xlsx_path: Option<&std::path::Path>, da
     println!("{} : {}", t("Scope", "范围"), scope_label(data));
     println!("{} : {}", t("Scoring", "评分模式"), strict_label);
     if zh {
-        println!("主机     : {} 台（可用 {} / 不可达 {} / 数据缺失 {}）", s.host_total, s.available, s.unavailable, s.missing_data);
+        println!("主机     : {} 台（可用 {} / 不可达 {} / 数据缺失 {} / 停用 {}）", s.host_total, s.available, s.unavailable, s.missing_data, s.host_disabled);
         println!("风险分布 : 健康 {} | 低危 {} | 中危 {} | 高危 {} | 严重 {}", s.risk_dist.healthy, s.risk_dist.low, s.risk_dist.medium, s.risk_dist.high, s.risk_dist.critical);
         println!("未恢复问题: {} 个（区间内新增 {}，区间前遗留 {}）", s.problem_open, s.problem_new_in_range, s.problem_carried_over);
     } else {
-        println!("Hosts     : {} (up {} / down {} / missing {})", s.host_total, s.available, s.unavailable, s.missing_data);
+        println!("Hosts     : {} (up {} / down {} / missing {} / disabled {})", s.host_total, s.available, s.unavailable, s.missing_data, s.host_disabled);
         println!("Risk dist : Healthy {} | Low {} | Medium {} | High {} | Critical {}", s.risk_dist.healthy, s.risk_dist.low, s.risk_dist.medium, s.risk_dist.high, s.risk_dist.critical);
         println!("Open problems: {} (new in range {}, carried over {})", s.problem_open, s.problem_new_in_range, s.problem_carried_over);
     }
@@ -342,7 +342,9 @@ pub fn report_console_detail(data: &ReportData) {
         row.push(comfy_table::Cell::new(&h.host.host));
         row.push(comfy_table::Cell::new(&h.host.ip));
         row.push(comfy_table::Cell::new(if h.os_family.is_empty() { "—" } else { &h.os_family }));
-        row.push(if h.available {
+        row.push(if h.host_disabled {
+            comfy_table::Cell::new(t("Disabled", "停用")).fg(Color::Cyan)
+        } else if h.available {
             comfy_table::Cell::new(t("Up", "正常")).fg(Color::Green)
         } else {
             comfy_table::Cell::new(t("Down", "不可达")).fg(Color::Red)
@@ -421,7 +423,13 @@ pub fn report_csv_string(data: &ReportData) -> String {
     for h in &data.hosts {
         let disk = h.metrics.disk_max.as_ref();
         let level = if zh { h.risk.level.clone() } else { bilingual::risk_level(&h.risk.level) };
-        let avail = if zh { if h.available { "正常" } else { "不可达" } } else { if h.available { "OK" } else { "Unreachable" } };
+        let avail = if h.host_disabled {
+            if zh { "停用".to_string() } else { "Disabled".to_string() }
+        } else if h.available {
+            if zh { "正常".to_string() } else { "OK".to_string() }
+        } else {
+            if zh { "不可达".to_string() } else { "Unreachable".to_string() }
+        };
         out.push_str(&format!(
             "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n",
             csv_escape(&h.host.host),

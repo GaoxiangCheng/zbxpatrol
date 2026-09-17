@@ -279,6 +279,7 @@ mod tests {
             units: String::new(),
             lastvalue: None,
             lastclock: None,
+            status: "0".into(),
         }
     }
 

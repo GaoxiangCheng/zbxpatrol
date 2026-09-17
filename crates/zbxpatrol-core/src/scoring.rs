@@ -329,10 +329,12 @@ mod tests {
             host: HostInfo {
                 hostid: "1".into(), host: "h1".into(), name: "h1".into(),
                 ip: "1.1.1.1".into(), groups: vec![], os_family: String::new(),
+                status: "0".into(),
             },
             os: "Linux".into(),
             os_family: "Linux".into(),
             available: true,
+            host_disabled: false,
             metrics: MainMetrics {
                 cpu: MetricStats { avg: Some(20.0), max: Some(40.0), ..Default::default() },
                 mem: MetricStats { avg: Some(30.0), ..Default::default() },
@@ -380,6 +382,7 @@ mod tests {
         let mut h = host();
         h.stability.reboots = Some(3);
         h.problems = vec![ProblemRec {
+            disabled: false,
             eventid: "1".into(), name: "x".into(), severity: 4,
             severity_label: "高危".into(), clock: 0, recovered: false,
             acknowledged: false, hosts: vec![],
