@@ -181,6 +181,12 @@ curl -LO https://github.com/GaoxiangCheng/zbxpatrol/releases/latest/download/zbx
 chmod +x zbxpatrol-macos-arm64 && xattr -d com.apple.quarantine zbxpatrol-macos-arm64 2>/dev/null; ./zbxpatrol-macos-arm64 --help
 ```
 
+## License & third-party notices
+
+- This project's code is released under the **GNU AGPL-3.0** license (versions 1.1.0 and earlier used a custom non-commercial license, kept in the git history).
+- **Zabbix statement**: zbxpatrol is an independent program that talks to Zabbix exclusively through its official JSON-RPC API; it **does not include, modify or redistribute** any Zabbix source or components. Zabbix itself is licensed under AGPL-3.0 — source and copyright: <https://github.com/zabbix/zabbix>. "Zabbix" is a trademark of Zabbix SIA; this project is not affiliated with Zabbix SIA.
+- Third-party component list (SBOM, CycloneDX): [SBOM/zbxpatrol.cdx.json](SBOM/zbxpatrol.cdx.json); summary and Zabbix statement in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
 ## Development
 
 ```bash

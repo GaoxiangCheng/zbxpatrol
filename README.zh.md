@@ -182,6 +182,12 @@ chmod +x zbxpatrol && ./zbxpatrol check          # ./zbxpatrol --version 查看�
 curl -LO https://github.com/GaoxiangCheng/zbxpatrol/releases/latest/download/zbxpatrol-macos-arm64
 chmod +x zbxpatrol-macos-arm64 && xattr -d com.apple.quarantine zbxpatrol-macos-arm64 2>/dev/null; ./zbxpatrol-macos-arm64 --help
 
+## 许可与第三方声明
+
+- 本项目代码以 **GNU AGPL-3.0** 许可发布（1.1.0 及更早版本使用旧的自定义非商业协议，见对应 tag 的 LICENSE）。
+- **Zabbix 声明**：本工具是独立程序，仅通过 Zabbix 官方 JSON-RPC API 与 Zabbix 服务端交互；**不包含、不修改、不分发** Zabbix 任何源码或组件。Zabbix 本身采用 AGPL-3.0 授权，其源码与版权归属见官方仓库 <https://github.com/zabbix/zabbix>；"Zabbix" 为 Zabbix SIA 的商标，本项目与 Zabbix SIA 无任何关联。
+- 第三方组件清单（SBOM，CycloneDX 格式）：[SBOM/zbxpatrol.cdx.json](SBOM/zbxpatrol.cdx.json)；摘要与 Zabbix 声明详见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+
 ## 开发
 
 ```bash
