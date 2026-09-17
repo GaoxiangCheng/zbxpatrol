@@ -118,7 +118,7 @@ Excel (`巡检报告_<from>-<to>_<scope>.xlsx`, conditional green/yellow/red):
 | Disk/inode | 98/95/90/85 | 90/85/80/75 | 80/75/70/65 |
 | CPU peak / swap / bandwidth,fd | 99 / 60 / 90 | 95 / 50 / 80 | 85 / 40 / 70 |
 
-Unreachable/failed services are critical outright; event rules (reboots, OOM, zombies, clock offset, certificates, high alerts) do not scale with the baseline. Levels: 0–39 healthy / 40–59 low / 60–74 medium / 75–89 high / 90–100 critical. The active mode and thresholds are recorded in the report and JSON (`strictness`). Custom `[[scoring]]` rules in `patrol.toml` replace the built-ins entirely (see `patrol.example.toml`).
+Unreachable/failed services are critical outright; event rules (reboots, OOM, zombies, clock offset, certificates, high alerts) do not scale with the baseline. Levels: 0–39 healthy / 40–59 low / 60–74 medium / 75–89 high / 90–100 critical. The active mode and thresholds are recorded in the report and JSON (`strictness`). Custom `[[scoring]]` rules in `patrol.toml` replace the built-ins entirely (examples in `patrol.example.toml`; **full custom-scoring guide: [docs/SCORING.en.md](docs/SCORING.en.md)**).
 
 ## Metrics (environment-adaptive)
 
@@ -168,21 +168,16 @@ cargo install cross && cross build --release --target x86_64-unknown-linux-musl
 
 > **Internal-DNS compatibility (built-in)**: ships the hickory pure-Rust resolver (glibc-compatible behavior), so static binaries resolve fine in internal-DNS environments with zero configuration (verified on Rocky Linux 9.8). Extreme fallback: append `"<zabbix-ip> <your-zabbix-domain>"` to `/etc/hosts`.
 
-## Install from the Gitea Package Registry (v1.1.0+)
+## Install from GitHub Releases (v1.2.0+)
 
-Prebuilt artifacts are published to the Gitea Generic Package Registry (macOS Apple Silicon / Linux x86_64 / Linux aarch64 — same codebase, no branches):
+Prebuilt static binaries are attached to each [GitHub Release](https://github.com/GaoxiangCheng/zbxpatrol/releases) (Linux x86_64 / Linux aarch64 / macOS Apple Silicon — no runtime dependencies, SHA-256 in `checksums-sha256.txt`):
 
 ```bash
-# download (<gitea-host> = your Gitea base URL; private packages need -u <user>:<pass>)
-curl -u <user>:<pass> -o zbxpatrol \
-  "http://<gitea-host>/api/packages/OM/generic/zbxpatrol/1.1.0/zbxpatrol-1.1.0-linux-x86_64"
+curl -LO https://github.com/GaoxiangCheng/zbxpatrol/releases/download/v1.2.0/zbxpatrol-1.2.0-linux-x86_64
 chmod +x zbxpatrol && ./zbxpatrol check
 
-# publish a new version (builds + uploads all platforms; host taken from git remote)
-GITEA_USER=<user> GITEA_PASS=<pass> ./deploy/package-upload.sh <version>
+# macOS note: unsigned build — first run may need: xattr -d com.apple.quarantine ./zbxpatrol
 ```
-
-Also downloadable from the Gitea web UI "Packages" page.
 
 ## Development
 

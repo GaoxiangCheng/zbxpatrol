@@ -120,7 +120,7 @@ Excel（`巡检报告_<起>-<止>_<范围>.xlsx`，条件格式绿/黄/红）：
 | 磁盘/inode | 98/95/90/85 | 90/85/80/75 | 80/75/70/65 |
 | CPU 峰值 / swap / 带宽、fd | 99 / 60 / 90 | 95 / 50 / 80 | 85 / 40 / 70 |
 
-可用性/服务失败直接严重；重启、OOM、僵尸、时间偏移、证书、高危告警等事件类规则不随基准缩放。等级：0–39 健康 / 40–59 低危 / 60–74 中危 / 75–89 高危 / 90–100 严重。所用模式与阈值写入报表总览、评分说明 sheet 与 JSON（`strictness` 字段）。`patrol.toml` 的 `[[scoring]]` 自定义规则存在时整体替换内置评分，不受模式影响（见 `patrol.example.toml`）。
+可用性/服务失败直接严重；重启、OOM、僵尸、时间偏移、证书、高危告警等事件类规则不随基准缩放。等级：0–39 健康 / 40–59 低危 / 60–74 中危 / 75–89 高危 / 90–100 严重。所用模式与阈值写入报表总览、评分说明 sheet 与 JSON（`strictness` 字段）。`patrol.toml` 的 `[[scoring]]` 自定义规则存在时整体替换内置评分，不受模式影响（示例见 `patrol.example.toml`，**完整自定义打分文档：[docs/SCORING.zh.md](docs/SCORING.zh.md)**）。
 
 ## 指标体系（环境自适应）
 
@@ -170,21 +170,15 @@ cargo install cross && cross build --release --target x86_64-unknown-linux-musl
 
 > **内网 DNS 兼容（已内置解决）**：程序内置 hickory 纯 Rust DNS 解析器（查询行为与 glibc/curl 一致），静态二进制在各类内网 DNS 环境下均可正常解析，**无需任何额外配置**。此特性在 Rocky Linux 9.8 + 内网 DNS 环境实测通过（此前 musl 自带解析器与部分内网 DNS 不兼容的问题已根治）。若极端环境仍报 `Name does not resolve`，兜底方案：`echo "<Zabbix服务器IP> <你的Zabbix域名>" >> /etc/hosts`（示例，替换为实际值）。
 
-## 从 Gitea 包管理器安装（v1.1.0+）
+## 从 GitHub Releases 安装（v1.2.0+）
 
-预编译产物已发布到 Gitea Generic Package Registry（macOS Apple 芯片 / Linux x86_64 / Linux aarch64，同一代码库编译，无需分支）：
+各平台预编译静态二进制附带在 [GitHub Release](https://github.com/GaoxiangCheng/zbxpatrol/releases)（Linux x86_64 / Linux aarch64 / macOS Apple 芯片，无运行时依赖，SHA-256 见 `checksums-sha256.txt`）：
 
 ```bash
-# 下载（<gitea-host> 替换为你的 Gitea 地址；私有包需 -u <user>:<pass>）
-curl -u <user>:<pass> -o zbxpatrol \
-  "http://<gitea-host>/api/packages/OM/generic/zbxpatrol/1.1.0/zbxpatrol-1.1.0-linux-x86_64"
+curl -LO https://github.com/GaoxiangCheng/zbxpatrol/releases/download/v1.2.0/zbxpatrol-1.2.0-linux-x86_64
 chmod +x zbxpatrol && ./zbxpatrol check
 
-# 发布新版本（构建 + 上传三平台，地址自动取自 git remote）
-GITEA_USER=<user> GITEA_PASS=<pass> ./deploy/package-upload.sh <version>
-```
-
-也可在 Gitea 网页「Packages」页直接下载。
+# macOS 提示：未公证构建，首次运行可能需要：xattr -d com.apple.quarantine ./zbxpatrol
 
 ## 开发
 

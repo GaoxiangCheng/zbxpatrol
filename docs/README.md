@@ -36,5 +36,5 @@ Quick start: repo root [README.md](../README.md).
 ## Conventions / 约定
 
 - Angle-bracket tokens in examples (e.g. `<host>`, `<group>`) are **variables** — replace with real values (Tab completion helps). 示例中尖括号内容为**变量**，替换为实际值。
-- All docs use multi-level anchors — TOC entries jump on Gitea. 文档使用多级锚点，可点击跳转。
+- All docs use multi-level anchors — TOC entries jump on click. 文档使用多级锚点，可点击跳转。
 - API consumers: import [openapi.yaml](openapi.yaml) into Swagger UI / Postman / code generators, and run `deploy/api-selftest.sh` against a live instance. API 使用方可导入 openapi.yaml，并运行自测脚本验证部署。

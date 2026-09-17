@@ -9,9 +9,9 @@
 | 项 | 值 |
 |---|---|
 | 名称 | zbxpatrol |
-| 版本 | 1.1.0 |
+| 版本 | 1.2.0 |
 | 语言 | Rust (edition 2021) |
-| 代码仓库 | http://<gitea-host>/<org>/zbxpatrol (Gitea) |
+| 代码仓库 | https://github.com/GaoxiangCheng/zbxpatrol (GitHub)；内网 Gitea 作镜像 |
 | 运行环境 | Linux x86_64/aarch64 (musl 静态)、macOS arm64 |
 | 依赖 | 零运行时依赖（单一二进制） |
 
@@ -124,7 +124,7 @@ cat target/x86_64-unknown-linux-musl/release/zbxpatrol | ssh root@<server> \
 | `zbxpatrol-serve.service` | 常驻 HTTP API |
 | `Dockerfile` | 容器构建 |
 | `crontab.example` | cron 定时任务示例 |
-| `package-upload.sh` | 构建+上传 Gitea Packages |
+| `package-upload.sh` | 构建+上传 Gitea Packages（内网分发可选；公开渠道用 GitHub Releases） |
 | `push.sh` | 一键 commit+push |
 
 ### 4.5 配置文件
@@ -161,23 +161,21 @@ cargo test -p zbxpatrol_core
 
 ---
 
-## 6. Gitea Packages 上传
+## 6. 发布（GitHub Releases）
 
 ```bash
-# 构建 + 上传三平台（GITEA_USER/GITEA_PASS 环境变量）
-GITEA_USER=<user> GITEA_PASS=<pass> ./deploy/package-upload.sh <version>
+# 构建三平台静态二进制（工具链：musl 交叉 / cargo-zigbuild + macOS SDK）
+cargo zigbuild --release --target x86_64-unknown-linux-musl
+cargo zigbuild --release --target aarch64-unknown-linux-musl
+cargo zigbuild --release --target aarch64-apple-darwin   # 需 SDKROOT 指向 macOS SDK
 
-# 手动上传
-curl -u <user>:<pass> --upload-file dist/zbxpatrol-1.1.0-linux-x86_64 \
-  "http://<gitea-host>/api/packages/<org>/generic/zbxpatrol/1.1.0/zbxpatrol-1.1.0-linux-x86_64"
-
-# 下载
-curl -u <user>:<pass> -o zbxpatrol \
-  "http://<gitea-host>/api/packages/<org>/generic/zbxpatrol/1.1.0/zbxpatrol-1.1.0-linux-x86_64"
+# 在 GitHub Releases 页附到对应 tag（或用 gh CLI）
+gh release create v<version> dist/* --title "v<version>" --notes "..."
 ```
 
----
+内网 Gitea 分发（可选保留）：`GITEA_USER=<user> GITEA_PASS=<pass> ./deploy/package-upload.sh <version>`。
 
+---
 ## 7. 已知限制与待改进
 
 | 项目 | 状态 | 说明 |
@@ -217,10 +215,10 @@ curl -u <user>:<pass> -o zbxpatrol \
 ## 9. 交接清单
 
 - [ ] 读本文档 + README.md 了解架构
-- [ ] `cargo test` 确认 24 个单测通过
+- [ ] `cargo test` 确认 28 个单测通过
 - [ ] `./deploy/api-selftest.sh` 确认 API 正常
 - [ ] 部署最新版到服务器并 `check` 通过
 - [ ] 阅读 docs/SCORING.zh.md 了解评分自定义
 - [ ] 阅读 docs/openapi.yaml 了解 API 契约
-- [ ] 确认 Gitea 仓库访问权限（OM/zbxpatrol）
-- [ ] 确认 Gitea Packages 上传权限
+- [ ] 确认 GitHub Releases 发布权限（GaoxiangCheng/zbxpatrol）
+- [ ] （可选，内网）确认 Gitea 镜像/Packages 上传权限
